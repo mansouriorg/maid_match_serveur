@@ -40,3 +40,11 @@ model Maid {
   // Relation to requests (optional, but good for history)
   // requests ServiceRequest[] 
 }
+
+// Add this to your schema.prisma
+model Admin {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   // Will store hashed password (e.g., $2b$10$...)
+  createdAt DateTime @default(now())
+}
