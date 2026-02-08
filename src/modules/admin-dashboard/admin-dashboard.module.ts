@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { AdminDashboardController } from './admin-dashboard.controller';
 import { AdminDashboardService } from './admin-dashboard.service';
+import { AdminDashboardController } from './admin-dashboard.controller';
 
 @Module({
   controllers: [AdminDashboardController],
-  providers: [AdminDashboardService]
+  providers: [AdminDashboardService],
 })
 export class AdminDashboardModule {}
