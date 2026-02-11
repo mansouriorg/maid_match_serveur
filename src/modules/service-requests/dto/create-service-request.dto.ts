@@ -1,31 +1,73 @@
-import { IsString, IsNotEmpty, IsInt, IsOptional, IsDateString, Min } from 'class-validator';
+import { 
+  IsString, 
+  IsNotEmpty, 
+  IsInt, 
+  IsOptional, 
+  IsDateString, 
+  Min, 
+  IsEmail, 
+  IsBoolean, 
+  IsArray 
+} from 'class-validator';
 
 export class CreateServiceRequestDto {
+  // --- Customer Info (from StepContact) ---
   @IsString()
   @IsNotEmpty()
-  fullName: string;
+  customerName: string;
+
+  @IsEmail()
+  @IsNotEmpty()
+  customerEmail: string;
 
   @IsString()
   @IsNotEmpty()
-  phoneNumber: string;
+  customerPhone: string;
 
+  // --- Property Info (from StepProperty) ---
   @IsString()
-  @IsOptional()
-  address?: string;
+  @IsNotEmpty()
+  address: string;
 
   @IsString()
   @IsNotEmpty()
-  serviceType: string;
-
-  @IsDateString() // Validates YYYY-MM-DDTHH:mm:ss format
-  @IsNotEmpty()
-  startTime: string;
+  propertyType: string; // e.g. "apartment", "villa"
 
   @IsInt()
   @Min(1)
-  duration: number;
+  rooms: number;
+
+  @IsInt()
+  @Min(1)
+  bathrooms: number;
 
   @IsString()
+  @IsNotEmpty()
+  cleaningType: string; // e.g. "standard", "deep"
+
+  @IsBoolean()
+  hasSupplies: boolean;
+
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  notes?: string;
+  extras?: string[]; // e.g. ["ironing", "pets"]
+
+  // --- Schedule Info (from StepSchedule) ---
+  @IsDateString() 
+  @IsNotEmpty()
+  startTime: string; // ISO String sent from frontend
+
+  @IsInt()
+  @Min(1)
+  durationHours: number;
+
+  @IsString()
+  @IsNotEmpty()
+  frequency: string; // e.g. "one-time", "weekly"
+
+  // --- System Fields ---
+  @IsString()
+  @IsOptional()
+  status?: string; // Defaults to "REQUESTED" in Schema if empty
 }

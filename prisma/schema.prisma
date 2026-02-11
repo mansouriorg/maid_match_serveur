@@ -14,40 +14,54 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-
 model ServiceRequest {
-  id          Int      @id @default(autoincrement())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            Int      @id @default(autoincrement())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  // Contact Info
-  fullName    String
-  phoneNumber String
-  address     String?
+  // Customer Info (Matches React StepContact)
+  customerName  String
+  customerEmail String
+  customerPhone String
+  
+  // Property Info (Matches React StepProperty)
+  address       String
+  propertyType  String   // apartment, villa, studio
+  rooms         Int
+  bathrooms     Int
+  cleaningType  String   // standard, deep
+  hasSupplies   Boolean
+  extras        String[] // Array for ["ironing", "pets", etc]
 
-  // Service Details
-  serviceType String   // e.g., 'Cleaning', 'Babysitting'
-  startTime   DateTime // The requested date/time
-  duration    Int      // In hours
-  notes       String?
+  // Schedule Info (Matches React StepSchedule)
+  startTime     DateTime
+  durationHours Int
+  frequency     String   // one-time, weekly, etc
   
   // Admin Status
-  status      String   @default("PENDING") // PENDING, CONTACTED, ASSIGNED
+  status        String   @default("REQUESTED") // REQUESTED, CONFIRMED, ASSIGNED, COMPLETED
+
+  // Relation: Link a Maid to this request (Optional until assigned)
+  maidId        Int?
+  maid          Maid?    @relation(fields: [maidId], references: [id])
 }
 
+// 2. NEW Maid Model (For your future dispatching)
 model Maid {
-  id          Int      @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   fullName    String
   phoneNumber String
-  specialty   String   // e.g., "Cleaning", "Nanny"
-  // Relation to requests (optional, but good for history)
-  // requests ServiceRequest[] 
+  specialty   String           // e.g., "Cleaning", "Nanny"
+  status      String           @default("AVAILABLE") // AVAILABLE, BUSY
+  
+  // Relation back to requests
+  requests    ServiceRequest[]
 }
 
-// Add this to your schema.prisma
+// 3. NEW Admin Model (For your Dashboard Login)
 model Admin {
   id        Int      @id @default(autoincrement())
   email     String   @unique
-  password  String   // Will store hashed password (e.g., $2b$10$...)
+  password  String   // Will store hashed password
   createdAt DateTime @default(now())
 }
