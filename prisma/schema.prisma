@@ -7,11 +7,14 @@
 generator client {
   provider = "prisma-client"
   output   = "../generated/prisma"
+  moduleFormat = "cjs"
+
 }
 
 datasource db {
   provider = "postgresql"
 }
+
 model ServiceRequest {
   id          Int      @id @default(autoincrement())
   createdAt   DateTime @default(now())
