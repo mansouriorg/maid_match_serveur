@@ -24,15 +24,23 @@ export class ServiceRequestsController {
   }
 
   // 2. GET /service-requests
-  // Used by: Admin Dashboard (List View)
-  // Usage: /service-requests?status=REQUESTED&search=Ahmed
+  // Used by: Admin Dashboard (List View) & Calendar Planning
+  // Usage List: /service-requests?status=REQUESTED&search=Ahmed
+  // Usage Calendar: /service-requests?minDate=2023-12-01&maxDate=2023-12-31
   @Get()
   findAll(
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('minDate') minDate?: string, // NEW: Start of calendar range
+    @Query('maxDate') maxDate?: string, // NEW: End of calendar range
   ) {
-    // Pass filters to the service
-    return this.serviceRequestsService.findAll({ status, search });
+    // Pass all filters to the updated service
+    return this.serviceRequestsService.findAll({ 
+      status, 
+      search, 
+      minDate, 
+      maxDate 
+    });
   }
 
   // 3. GET /service-requests/:id
@@ -44,7 +52,6 @@ export class ServiceRequestsController {
 
   // 4. PATCH /service-requests/:id/status
   // Used by: Admin (Mark as "CONFIRMED", "COMPLETED" or "CANCELLED")
-  // Usage: PATCH /service-requests/1/status { "status": "CONFIRMED" }
   @Patch(':id/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number, 

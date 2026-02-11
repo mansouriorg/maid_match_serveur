@@ -22,16 +22,30 @@ export class ServiceRequestsService {
     });
   }
 
-  // 2. Get all requests (Supports Search by Name/Phone & Status Filter)
-  async findAll(params?: { status?: string; search?: string }) {
-    const { status, search } = params || {};
+  // 2. Get all requests (Supports Search, Status & Date Range for Planning)
+  async findAll(params?: { 
+    status?: string; 
+    search?: string; 
+    minDate?: string; 
+    maxDate?: string 
+  }) {
+    const { status, search, minDate, maxDate } = params || {};
 
     return this.prisma.serviceRequest.findMany({
       where: {
-        // Filter by Status (if provided)
+        // A. Filter by Status (if provided)
         ...(status && { status }),
+
+        // B. Filter by Date Range (NEW: For Calendar/Planning)
+        // Usage: ?minDate=2023-01-01&maxDate=2023-01-31
+        ...(minDate && maxDate ? {
+            startTime: {
+                gte: new Date(minDate), // Start of range
+                lte: new Date(maxDate), // End of range
+            }
+        } : {}),
         
-        // Search by Name OR Phone (if provided)
+        // C. Search by Name OR Phone (if provided)
         ...(search && {
           OR: [
             { customerName: { contains: search, mode: 'insensitive' } },
@@ -39,7 +53,10 @@ export class ServiceRequestsService {
           ],
         }),
       },
-      orderBy: { createdAt: 'desc' }, // Newest first
+      // D. Sorting
+      // If we are filtering by date (Calendar), sort by StartTime
+      // Otherwise (List view), sort by Newest created
+      orderBy: (minDate && maxDate) ? { startTime: 'asc' } : { createdAt: 'desc' },
       include: { maid: true },
     });
   }
@@ -74,7 +91,6 @@ export class ServiceRequestsService {
       });
 
       // B. If the job is finished/cancelled, set the maid back to AVAILABLE
-      // We check if a maid was actually assigned before trying to free them
       if (['COMPLETED', 'CANCELLED', 'REJECTED'].includes(status) && request.maidId) {
         await tx.maid.update({
           where: { id: request.maidId },
@@ -95,7 +111,7 @@ export class ServiceRequestsService {
     const maid = await this.prisma.maid.findUnique({ where: { id: maidId } });
     if (!maid) throw new NotFoundException(`Maid #${maidId} not found`);
 
-    // C. Check if Maid is already busy (Optional but recommended safety check)
+    // C. Check if Maid is already busy
     if (maid.status === 'BUSY') {
        throw new ConflictException(`Maid ${maid.fullName} is currently busy with another mission.`);
     }
