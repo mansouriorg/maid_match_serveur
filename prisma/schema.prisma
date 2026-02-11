@@ -14,6 +14,7 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
 model ServiceRequest {
   id            Int      @id @default(autoincrement())
   createdAt     DateTime @default(now())
@@ -47,15 +48,33 @@ model ServiceRequest {
 }
 
 // 2. NEW Maid Model (For your future dispatching)
+// 2. ENHANCED Maid Model
 model Maid {
-  id          Int              @id @default(autoincrement())
-  fullName    String
-  phoneNumber String
-  specialty   String           // e.g., "Cleaning", "Nanny"
-  status      String           @default("AVAILABLE") // AVAILABLE, BUSY
+  id              Int              @id @default(autoincrement())
+  createdAt       DateTime         @default(now())
+  
+  // Basic Info
+  fullName        String
+  phoneNumber     String
+  profilePicture  String?          // URL to image (optional)
+
+  // Professional Details
+  specialty       String           // e.g., "Cleaning", "Nanny", "Deep Clean Expert"
+  experienceYears Int              @default(0) // How long they have been working
+  bio             String?          // e.g. "Hardworking and detail-oriented with 5 years experience."
+  
+  // Skills & Logistics
+  languages       String[]         // e.g. ["Arabic", "French"]
+  
+  // Quality & Trust
+  rating          Float            @default(5.0) // 0.0 to 5.0 stars
+  isVerified      Boolean          @default(false) // Have you checked their ID/CIN?
+  
+  // Status
+  status          String           @default("AVAILABLE") // AVAILABLE, BUSY, ON_LEAVE
   
   // Relation back to requests
-  requests    ServiceRequest[]
+  requests        ServiceRequest[]
 }
 
 // 3. NEW Admin Model (For your Dashboard Login)
