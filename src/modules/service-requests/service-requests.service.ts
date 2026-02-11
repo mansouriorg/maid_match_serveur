@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { 
+  Injectable, 
+  NotFoundException, 
+  BadRequestException, 
+  ConflictException 
+} from '@nestjs/common';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -11,35 +16,39 @@ export class ServiceRequestsService {
     return this.prisma.serviceRequest.create({
       data: {
         ...createDto,
-        // Ensure the string from DTO is converted to a Date object for the DB
-        startTime: new Date(createDto.startTime), 
-        // Default status is set to "REQUESTED" by Schema, so we don't need to set it manually unless overridden
+        startTime: new Date(createDto.startTime),
+        status: 'REQUESTED',
       },
     });
   }
 
-  // 2. Get all requests (Used by Admin Dashboard)
-  // UPDATED: Added optional 'status' filter
-  async findAll(status?: string) {
+  // 2. Get all requests (Now supports Search by Name/Phone)
+  async findAll(params?: { status?: string; search?: string }) {
+    const { status, search } = params || {};
+
     return this.prisma.serviceRequest.findMany({
-      where: status ? { status } : {}, // If status is provided, filter by it
-      orderBy: {
-        createdAt: 'desc', // Show newest requests first
+      where: {
+        // Filter by Status (if provided)
+        ...(status && { status }),
+        
+        // Search by Name OR Phone (if provided)
+        ...(search && {
+          OR: [
+            { customerName: { contains: search, mode: 'insensitive' } },
+            { customerPhone: { contains: search, mode: 'insensitive' } },
+          ],
+        }),
       },
-      include: {
-        maid: true, // Also fetch the assigned Maid details if one exists
-      },
+      orderBy: { createdAt: 'desc' },
+      include: { maid: true },
     });
   }
 
   // 3. Get ONE request by ID (Used for Detail View)
-  // NEW: Needed for clicking on a request in the dashboard
   async findOne(id: number) {
     const request = await this.prisma.serviceRequest.findUnique({
       where: { id },
-      include: {
-        maid: true, // See which maid is assigned
-      },
+      include: { maid: true },
     });
 
     if (!request) {
@@ -49,31 +58,59 @@ export class ServiceRequestsService {
     return request;
   }
 
-  // 4. Update status (Used by Admin to mark as 'CONFIRMED' or 'COMPLETED')
+  // 4. Update Status (With Smart Logic)
+  // Logic: If job is 'COMPLETED' or 'CANCELLED', free up the maid automatically.
   async updateStatus(id: number, status: string) {
-    // Check if exists first
-    await this.findOne(id); 
+    const request = await this.findOne(id);
 
-    return this.prisma.serviceRequest.update({
-      where: { id },
-      data: { status },
+    // Transaction: Update request AND Update Maid status together
+    return this.prisma.$transaction(async (tx) => {
+      
+      // A. Update the Request Status
+      const updatedRequest = await tx.serviceRequest.update({
+        where: { id },
+        data: { status },
+        include: { maid: true }
+      });
+
+      // B. If the job is finished/cancelled, set the maid back to AVAILABLE
+      if (['COMPLETED', 'CANCELLED', 'REJECTED'].includes(status) && request.maidId) {
+        await tx.maid.update({
+          where: { id: request.maidId },
+          data: { status: 'AVAILABLE' },
+        });
+      }
+
+      return updatedRequest;
     });
   }
 
-  // 5. Assign a Maid to a Request (NEW)
-  // Connects the Maid table to the ServiceRequest table
+  // 5. Assign a Maid to a Request (With Validation)
   async assignMaid(requestId: number, maidId: number) {
+    // A. Check if Request exists
     await this.findOne(requestId);
 
-    return this.prisma.serviceRequest.update({
-      where: { id: requestId },
-      data: {
-        maidId: maidId,
-        status: 'ASSIGNED', // Automatically update status
-      },
-      include: {
-        maid: true, // Return the updated object with maid info
-      },
+    // B. Check if Maid exists
+    const maid = await this.prisma.maid.findUnique({ where: { id: maidId } });
+    if (!maid) throw new NotFoundException('Maid not found');
+
+    // C. Perform updates in a Transaction
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Mark Maid as BUSY
+      await tx.maid.update({
+        where: { id: maidId },
+        data: { status: 'BUSY' },
+      });
+
+      // 2. Link Maid to Request and update status to ASSIGNED
+      return tx.serviceRequest.update({
+        where: { id: requestId },
+        data: {
+          maidId: maidId,
+          status: 'ASSIGNED',
+        },
+        include: { maid: true },
+      });
     });
   }
 

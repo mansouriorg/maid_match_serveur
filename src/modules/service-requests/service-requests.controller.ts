@@ -23,12 +23,16 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.create(createDto);
   }
 
-  // 2. GET /service-requests?status=REQUESTED
+  // 2. GET /service-requests
   // Used by: Admin Dashboard (List View)
-  // Supports optional query param: /service-requests?status=PENDING
+  // Usage: /service-requests?status=REQUESTED&search=Ahmed
   @Get()
-  findAll(@Query('status') status?: string) {
-    return this.serviceRequestsService.findAll(status);
+  findAll(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+  ) {
+    // Pass filters to the service
+    return this.serviceRequestsService.findAll({ status, search });
   }
 
   // 3. GET /service-requests/:id
@@ -39,7 +43,7 @@ export class ServiceRequestsController {
   }
 
   // 4. PATCH /service-requests/:id/status
-  // Used by: Admin (Mark as "CONFIRMED" or "COMPLETED")
+  // Used by: Admin (Mark as "CONFIRMED", "COMPLETED" or "CANCELLED")
   @Patch(':id/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number, 

@@ -9,9 +9,10 @@ import {
   IsBoolean, 
   IsArray 
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateServiceRequestDto {
-  // --- Customer Info (from StepContact) ---
+  // --- Customer Info ---
   @IsString()
   @IsNotEmpty()
   customerName: string;
@@ -24,7 +25,7 @@ export class CreateServiceRequestDto {
   @IsNotEmpty()
   customerPhone: string;
 
-  // --- Property Info (from StepProperty) ---
+  // --- Property Info ---
   @IsString()
   @IsNotEmpty()
   address: string;
@@ -35,10 +36,12 @@ export class CreateServiceRequestDto {
 
   @IsInt()
   @Min(1)
+  @Type(() => Number) // ✅ Auto-convert "3" to 3
   rooms: number;
 
   @IsInt()
   @Min(1)
+  @Type(() => Number) // ✅ Auto-convert "1" to 1
   bathrooms: number;
 
   @IsString()
@@ -46,6 +49,7 @@ export class CreateServiceRequestDto {
   cleaningType: string; // e.g. "standard", "deep"
 
   @IsBoolean()
+  @Type(() => Boolean) // ✅ Auto-convert "true" string to boolean
   hasSupplies: boolean;
 
   @IsArray()
@@ -53,13 +57,14 @@ export class CreateServiceRequestDto {
   @IsOptional()
   extras?: string[]; // e.g. ["ironing", "pets"]
 
-  // --- Schedule Info (from StepSchedule) ---
+  // --- Schedule Info ---
   @IsDateString() 
   @IsNotEmpty()
   startTime: string; // ISO String sent from frontend
 
   @IsInt()
   @Min(1)
+  @Type(() => Number) // ✅ Auto-convert "4" to 4
   durationHours: number;
 
   @IsString()
@@ -69,5 +74,5 @@ export class CreateServiceRequestDto {
   // --- System Fields ---
   @IsString()
   @IsOptional()
-  status?: string; // Defaults to "REQUESTED" in Schema if empty
+  status?: string; // Defaults to "REQUESTED"
 }

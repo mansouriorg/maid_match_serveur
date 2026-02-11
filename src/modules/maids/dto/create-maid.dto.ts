@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsPhoneNumber, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsInt, Min, IsArray } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateMaidDto {
   @IsString()
@@ -16,4 +17,21 @@ export class CreateMaidDto {
   @IsString()
   @IsOptional()
   address?: string;
+
+  // --- NEW FIELDS MATCHING YOUR FRONTEND FORM ---
+
+  @IsOptional()
+  @Type(() => Number) // <--- CRITICAL: Converts "5" (string) to 5 (number)
+  @IsInt()
+  @Min(0)
+  experienceYears?: number;
+
+  @IsOptional()
+  @IsString()
+  bio?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true }) // Ensures every item in the array is a string
+  languages?: string[];
 }
