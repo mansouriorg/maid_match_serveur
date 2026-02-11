@@ -32,7 +32,7 @@ export class CreateServiceRequestDto {
 
   @IsString()
   @IsNotEmpty()
-  propertyType: string; // e.g. "apartment", "villa"
+  propertyType: string; // e.g. "apartment", "villa", "office"
 
   @IsInt()
   @Min(1)
@@ -60,7 +60,7 @@ export class CreateServiceRequestDto {
   // --- Schedule Info ---
   @IsDateString() 
   @IsNotEmpty()
-  startTime: string; // ISO String sent from frontend
+  startTime: string; // ISO String
 
   @IsInt()
   @Min(1)
@@ -71,8 +71,14 @@ export class CreateServiceRequestDto {
   @IsNotEmpty()
   frequency: string; // e.g. "one-time", "weekly"
 
-  // --- System Fields ---
-  @IsString()
+  // --- Admin / System Fields (NEW) ---
+
   @IsOptional()
-  status?: string; // Defaults to "REQUESTED"
+  @IsString()
+  status?: string; // Allows Admin to create "CONFIRMED" or "ASSIGNED" directly
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number) // ✅ Auto-convert "5" to 5
+  maidId?: number; // Allows Admin to immediately assign a maid
 }

@@ -11,13 +11,45 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class ServiceRequestsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // 1. Create a new request (Used by Frontend Wizard)
+  // 1. Create a new request (Updated for Admin Manual Entry)
   async create(createDto: CreateServiceRequestDto) {
+    // Logic: Determine initial status
+    // If maidId is provided, force status to ASSIGNED.
+    // Otherwise use provided status (e.g. CONFIRMED) or default to REQUESTED.
+    let initialStatus = createDto.status || 'REQUESTED';
+
+    if (createDto.maidId) {
+      initialStatus = 'ASSIGNED';
+    }
+
+    // Use a transaction if we are assigning a maid immediately to ensure consistency
+    if (createDto.maidId) {
+        return this.prisma.$transaction(async (tx) => {
+            // A. Create the Request
+            const request = await tx.serviceRequest.create({
+                data: {
+                    ...createDto,
+                    startTime: new Date(createDto.startTime),
+                    status: initialStatus,
+                },
+            });
+
+            // B. Mark Maid as BUSY
+            await tx.maid.update({
+                where: { id: createDto.maidId },
+                data: { status: 'BUSY' }
+            });
+
+            return request;
+        });
+    }
+
+    // Standard Creation (No Maid assigned yet)
     return this.prisma.serviceRequest.create({
       data: {
         ...createDto,
         startTime: new Date(createDto.startTime),
-        status: 'REQUESTED',
+        status: initialStatus,
       },
     });
   }
@@ -36,8 +68,7 @@ export class ServiceRequestsService {
         // A. Filter by Status (if provided)
         ...(status && { status }),
 
-        // B. Filter by Date Range (NEW: For Calendar/Planning)
-        // Usage: ?minDate=2023-01-01&maxDate=2023-01-31
+        // B. Filter by Date Range (For Calendar/Planning)
         ...(minDate && maxDate ? {
             startTime: {
                 gte: new Date(minDate), // Start of range
@@ -54,8 +85,7 @@ export class ServiceRequestsService {
         }),
       },
       // D. Sorting
-      // If we are filtering by date (Calendar), sort by StartTime
-      // Otherwise (List view), sort by Newest created
+      // If we are filtering by date (Calendar), sort by StartTime. Otherwise by Newest.
       orderBy: (minDate && maxDate) ? { startTime: 'asc' } : { createdAt: 'desc' },
       include: { maid: true },
     });
