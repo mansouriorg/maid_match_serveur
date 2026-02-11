@@ -22,7 +22,7 @@ export class ServiceRequestsService {
     });
   }
 
-  // 2. Get all requests (Now supports Search by Name/Phone)
+  // 2. Get all requests (Supports Search by Name/Phone & Status Filter)
   async findAll(params?: { status?: string; search?: string }) {
     const { status, search } = params || {};
 
@@ -39,7 +39,7 @@ export class ServiceRequestsService {
           ],
         }),
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' }, // Newest first
       include: { maid: true },
     });
   }
@@ -74,6 +74,7 @@ export class ServiceRequestsService {
       });
 
       // B. If the job is finished/cancelled, set the maid back to AVAILABLE
+      // We check if a maid was actually assigned before trying to free them
       if (['COMPLETED', 'CANCELLED', 'REJECTED'].includes(status) && request.maidId) {
         await tx.maid.update({
           where: { id: request.maidId },
@@ -85,16 +86,21 @@ export class ServiceRequestsService {
     });
   }
 
-  // 5. Assign a Maid to a Request (With Validation)
+  // 5. Assign a Maid to a Request (With Validation & Transaction)
   async assignMaid(requestId: number, maidId: number) {
     // A. Check if Request exists
     await this.findOne(requestId);
 
     // B. Check if Maid exists
     const maid = await this.prisma.maid.findUnique({ where: { id: maidId } });
-    if (!maid) throw new NotFoundException('Maid not found');
+    if (!maid) throw new NotFoundException(`Maid #${maidId} not found`);
 
-    // C. Perform updates in a Transaction
+    // C. Check if Maid is already busy (Optional but recommended safety check)
+    if (maid.status === 'BUSY') {
+       throw new ConflictException(`Maid ${maid.fullName} is currently busy with another mission.`);
+    }
+
+    // D. Perform updates in a Transaction (All or Nothing)
     return this.prisma.$transaction(async (tx) => {
       // 1. Mark Maid as BUSY
       await tx.maid.update({

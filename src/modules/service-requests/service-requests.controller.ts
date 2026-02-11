@@ -44,6 +44,7 @@ export class ServiceRequestsController {
 
   // 4. PATCH /service-requests/:id/status
   // Used by: Admin (Mark as "CONFIRMED", "COMPLETED" or "CANCELLED")
+  // Usage: PATCH /service-requests/1/status { "status": "CONFIRMED" }
   @Patch(':id/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number, 
@@ -54,7 +55,7 @@ export class ServiceRequestsController {
 
   // 5. PATCH /service-requests/:id/assign
   // Used by: Admin (Assign a Maid to a Request)
-  // Payload: { "maidId": 5 }
+  // Usage: PATCH /service-requests/1/assign { "maidId": 5 }
   @Patch(':id/assign')
   assignMaid(
     @Param('id', ParseIntPipe) id: number,
