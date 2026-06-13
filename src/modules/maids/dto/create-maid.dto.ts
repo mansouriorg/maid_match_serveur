@@ -1,21 +1,27 @@
 import { IsString, IsNotEmpty, IsOptional, IsInt, Min, IsArray } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
+import * as xss from 'xss'; // <-- Import de la bibliothèque de sécurité
 
 export class CreateMaidDto {
   @IsString()
   @IsNotEmpty()
+  // Nettoyage des espaces inutiles et neutralisation des balises HTML/Scripts
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   fullName: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   phoneNumber: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   specialty: string; // e.g. "Deep Cleaning", "Elderly Care"
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   address?: string;
 
   // --- NEW FIELDS MATCHING YOUR FRONTEND FORM ---
@@ -28,10 +34,19 @@ export class CreateMaidDto {
 
   @IsOptional()
   @IsString()
+  // 🔥 Le champ le plus à risque (Texte libre) : Protection XSS maximale
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   bio?: string;
 
   @IsOptional()
   @IsArray()
   @IsString({ each: true }) // Ensures every item in the array is a string
+  // Nettoyage pour chaque élément du tableau
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value.map(v => (typeof v === 'string' ? xss.filterXSS(v.trim()) : v));
+    }
+    return value;
+  })
   languages?: string[];
 }

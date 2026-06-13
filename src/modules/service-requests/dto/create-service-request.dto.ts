@@ -8,31 +8,42 @@ import {
   IsEmail, 
   IsBoolean, 
   IsArray,
-  IsNumber // <-- NOUVEL IMPORT ICI
+  IsNumber 
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
+import * as xss from 'xss'; // <-- Import de la bibliothèque de sécurité
 
 export class CreateServiceRequestDto {
   // --- Customer Info ---
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   customerName: string;
 
   @IsEmail()
   @IsNotEmpty()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return xss.filterXSS(value.trim().toLowerCase()); // Nettoyage + minuscules
+    }
+    return value;
+  })
   customerEmail: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   customerPhone: string;
 
   // --- Property Info ---
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   address: string;
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   propertyType: string; // e.g. "apartment", "villa", "office"
 
   @IsInt()
@@ -47,6 +58,7 @@ export class CreateServiceRequestDto {
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   cleaningType: string; // e.g. "standard", "deep"
 
   @IsBoolean()
@@ -56,12 +68,20 @@ export class CreateServiceRequestDto {
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  extras?: string[]; // e.g. ["ironing", "pets"]
+  @Transform(({ value }) => {
+    // Nettoyage de chaque option dans le tableau ["ironing", "pets"]
+    if (Array.isArray(value)) {
+      return value.map(v => (typeof v === 'string' ? xss.filterXSS(v.trim()) : v));
+    }
+    return value;
+  })
+  extras?: string[];
 
   // --- Schedule Info ---
   @IsDateString() 
   @IsNotEmpty()
-  startTime: string; // ISO String
+  // Pas besoin de filtre XSS ici, IsDateString rejette strictement tout ce qui n'est pas une date ISO valide
+  startTime: string; 
 
   @IsInt()
   @Min(1)
@@ -70,25 +90,38 @@ export class CreateServiceRequestDto {
 
   @IsString()
   @IsNotEmpty()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   frequency: string; // e.g. "one-time", "weekly"
 
   // --- Admin / System Fields ---
   @IsOptional()
   @IsString()
-  status?: string; // Allows Admin to create "CONFIRMED" or "ASSIGNED" directly
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return xss.filterXSS(value.trim().toUpperCase()); // Force majuscules
+    }
+    return value;
+  })
+  status?: string; 
 
   @IsOptional()
   @IsInt()
   @Type(() => Number)
-  maidId?: number; // Allows Admin to immediately assign a maid
+  maidId?: number; 
 
   // --- NOUVEAUX CHAMPS FINANCIERS ---
   @IsOptional()
   @IsNumber()
-  @Type(() => Number) // Sécurité : convertit une string "75" en nombre 75
+  @Type(() => Number)
   totalPrice?: number;
 
   @IsOptional()
   @IsString()
-  paymentStatus?: string; // e.g. "PENDING", "PAID"
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return xss.filterXSS(value.trim().toUpperCase()); // Force majuscules (ex: " paid " -> "PAID")
+    }
+    return value;
+  })
+  paymentStatus?: string; 
 }

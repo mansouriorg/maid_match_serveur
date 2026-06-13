@@ -1,35 +1,54 @@
-import { IsString, IsOptional, IsBoolean, IsEmail } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsEmail, IsNumber, Min } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import * as xss from 'xss';
 
 export class UpdateSettingsDto {
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   firstName?: string;
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   lastName?: string;
 
   @IsEmail()
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return xss.filterXSS(value.trim().toLowerCase()); // Nettoyage + minuscules
+    }
+    return value;
+  })
   email?: string;
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   companyName?: string;
 
   @IsString()
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
   contactPhone?: string;
 
-  // On accepte les deux car depuis le front, un input type="number" renvoie souvent une string
+  // 🛡️ SÉCURITÉ : Plus besoin d'accepter "number | string". 
+  // @Type() va automatiquement et proprement convertir "15" en 15.
   @IsOptional()
-  defaultHourlyRate?: number | string;
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  defaultHourlyRate?: number;
 
-  @IsBoolean()
+  // 🛡️ SÉCURITÉ : Idem pour les booléens envoyés depuis des formulaires
   @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
   emailAlerts?: boolean;
 
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
   smsAlerts?: boolean;
 }
