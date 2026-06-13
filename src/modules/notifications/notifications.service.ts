@@ -41,6 +41,7 @@ export class NotificationsService {
         title,
         message,
         isRead: false,
+        serviceRequestId: serviceRequest.id, // <-- AJOUT ICI : Lien avec l'ID de la demande
       },
     });
     
