@@ -7,36 +7,30 @@ import {
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service'; 
+import { AuditService } from '../audit/audit.service'; // <-- IMPORT DE L'AUDIT
 
 @Injectable()
 export class ServiceRequestsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService 
+    private readonly notificationsService: NotificationsService,
+    private readonly auditService: AuditService // <-- INJECTION DE L'AUDIT
   ) {}
 
-  // --- NOUVEAU : Fonction privée ASYNCHRONE pour calculer le prix depuis la BDD ---
   private async calculatePrice(dto: CreateServiceRequestDto): Promise<number> {
-    // 1. On récupère les paramètres dynamiques depuis la base de données
     const settings = await this.prisma.settings.findUnique({ where: { id: 1 } });
-    
-    // 2. On utilise le tarif défini par l'admin, ou 15 en solution de secours
     let pricePerHour = settings?.defaultHourlyRate || 15; 
 
-    // 3. Majoration si c'est un nettoyage en profondeur
     if (dto.cleaningType === 'deep') {
       pricePerHour += 5; 
     }
 
-    // 4. Calcul du prix de base (Heures * Prix horaire dynamique)
     let total = dto.durationHours * pricePerHour;
 
-    // 5. Frais si la femme de ménage doit ramener ses produits
     if (dto.hasSupplies === false) {
       total += 20; 
     }
 
-    // 6. Frais pour les extras (ex: 10 TND par extra)
     if (dto.extras && dto.extras.length > 0) {
       total += (dto.extras.length * 10); 
     }
@@ -44,7 +38,7 @@ export class ServiceRequestsService {
     return total;
   }
 
-  // 1. Create a new request (Updated with Dynamic Price & Payment Status)
+  // 1. Create a new request
   async create(createDto: CreateServiceRequestDto) {
     let initialStatus = createDto.status || 'REQUESTED';
 
@@ -52,9 +46,7 @@ export class ServiceRequestsService {
       initialStatus = 'ASSIGNED';
     }
 
-    // CALCUL DU PRIX EXACT ICI
     const finalPrice = createDto.totalPrice || await this.calculatePrice(createDto);
-    // On prend le statut de paiement s'il est envoyé, sinon c'est PENDING par défaut.
     const paymentStat = createDto.paymentStatus || 'PENDING';
 
     let newRequest;
@@ -67,7 +59,7 @@ export class ServiceRequestsService {
                     startTime: new Date(createDto.startTime),
                     status: initialStatus,
                     totalPrice: finalPrice, 
-                    paymentStatus: paymentStat, // NOUVEAU
+                    paymentStatus: paymentStat, 
                 },
             });
 
@@ -85,7 +77,7 @@ export class ServiceRequestsService {
             startTime: new Date(createDto.startTime),
             status: initialStatus,
             totalPrice: finalPrice, 
-            paymentStatus: paymentStat, // NOUVEAU
+            paymentStatus: paymentStat, 
           },
         });
     }
@@ -141,11 +133,11 @@ export class ServiceRequestsService {
     return request;
   }
 
-  // 4. Update Status (Workflow)
-  async updateStatus(id: number, status: string) {
+  // 4. Update Status (Workflow) + AUDIT
+  async updateStatus(id: number, status: string, adminId?: number) {
     const request = await this.findOne(id);
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updatedRequest = await tx.serviceRequest.update({
         where: { id },
         data: { status },
@@ -161,10 +153,21 @@ export class ServiceRequestsService {
 
       return updatedRequest;
     });
+
+    // 🛡️ LOG : Changement de statut du workflow
+    await this.auditService.logAction(
+      'UPDATE_STATUS',
+      'ServiceRequest',
+      id,
+      `Statut du workflow passé de ${request.status} à ${status}.`,
+      adminId
+    );
+
+    return result;
   }
 
-  // 5. Assign a Maid
-  async assignMaid(requestId: number, maidId: number) {
+  // 5. Assign a Maid + AUDIT
+  async assignMaid(requestId: number, maidId: number, adminId?: number) {
     await this.findOne(requestId);
 
     const maid = await this.prisma.maid.findUnique({ where: { id: maidId } });
@@ -174,7 +177,7 @@ export class ServiceRequestsService {
        throw new ConflictException(`Maid ${maid.fullName} is currently busy with another mission.`);
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.maid.update({
         where: { id: maidId },
         data: { status: 'BUSY' },
@@ -189,27 +192,72 @@ export class ServiceRequestsService {
         include: { maid: true },
       });
     });
+
+    // 🛡️ LOG : Assignation d'intervenant
+    await this.auditService.logAction(
+      'ASSIGN_MAID',
+      'ServiceRequest',
+      requestId,
+      `L'intervenant(e) ${maid.fullName} (ID: ${maidId}) a été assigné(e) à la mission.`,
+      adminId
+    );
+
+    return result;
   }
 
-  // 6. NOUVEAU : Update General Fields (For Payment Status changes)
-  async update(id: number, updateData: any) {
-    await this.findOne(id);
+  // 6. Update General Fields (Payment, Price) + AUDIT
+  async update(id: number, updateData: any, adminId?: number) {
+    const oldRequest = await this.findOne(id);
 
-    // On utilise updateData qui peut contenir { paymentStatus: 'PAID' }
-    return this.prisma.serviceRequest.update({
+    const updatedRequest = await this.prisma.serviceRequest.update({
       where: { id },
       data: updateData,
       include: { maid: true }
     });
+
+    // 🛡️ LOG : Changement de prix
+    if (updateData.totalPrice !== undefined && updateData.totalPrice !== oldRequest.totalPrice) {
+      await this.auditService.logAction(
+        'UPDATE_PRICE',
+        'ServiceRequest',
+        id,
+        `Le prix est passé de ${oldRequest.totalPrice} TND à ${updateData.totalPrice} TND.`,
+        adminId
+      );
+    }
+
+    // 🛡️ LOG : Changement de statut de paiement
+    if (updateData.paymentStatus && updateData.paymentStatus !== oldRequest.paymentStatus) {
+      await this.auditService.logAction(
+        'UPDATE_PAYMENT',
+        'ServiceRequest',
+        id,
+        `Le statut de paiement est passé de ${oldRequest.paymentStatus} à ${updateData.paymentStatus}.`,
+        adminId
+      );
+    }
+
+    return updatedRequest;
   }
 
-  // 7. Delete a request
-  async remove(id: number) {
-    await this.findOne(id); 
+  // 7. Delete a request + AUDIT
+  async remove(id: number, adminId?: number) {
+    const request = await this.findOne(id); 
 
-    return this.prisma.serviceRequest.delete({
+    const result = await this.prisma.serviceRequest.delete({
       where: { id },
     });
+
+    // 🛡️ LOG : Suppression définitive
+    await this.auditService.logAction(
+      'DELETE_REQUEST',
+      'ServiceRequest',
+      id,
+      `La mission au nom de ${request.customerName} a été définitivement supprimée.`,
+      adminId
+    );
+
+    return result;
   }
 
   // 8. Analytics
@@ -223,8 +271,6 @@ export class ServiceRequestsService {
       },
     });
 
-    // C. Revenu EXACT basé sur la nouvelle colonne totalPrice
-    // NOUVEAU : On ajoute aussi les revenus ENCAISSÉS vs ATTENDUS
     const revenueResult = await this.prisma.serviceRequest.groupBy({
         by: ['paymentStatus'],
         _sum: {
@@ -238,9 +284,7 @@ export class ServiceRequestsService {
         },
     });
       
-    // Calcul de l'argent total estimé
     let estimatedRevenue = 0;
-    // Calcul de l'argent réellement encaissé (PAID)
     let collectedRevenue = 0;
     let totalHours = 0;
 
@@ -269,7 +313,7 @@ export class ServiceRequestsService {
       },
       totalHours,
       estimatedRevenue,
-      collectedRevenue // Optionnel : l'argent réellement dans ta poche !
+      collectedRevenue 
     };
   }
 }

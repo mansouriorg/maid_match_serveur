@@ -14,7 +14,6 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
-
 // 1. Service Request Model
 model ServiceRequest {
   id            Int      @id @default(autoincrement())
@@ -87,6 +86,9 @@ model Admin {
   email     String   @unique
   password  String   // Will store hashed password
   createdAt DateTime @default(now())
+
+  // NOUVEAU : Relation inverse pour l'historique d'audit
+  auditLogs AuditLog[] 
 }
 
 // 4. NEW Notification Model (For Dashboard Real-time Alerts)
@@ -113,4 +115,18 @@ model Settings {
   emailAlerts       Boolean  @default(true)
   smsAlerts         Boolean  @default(false)
   updatedAt         DateTime @updatedAt
+}
+
+// 6. NOUVEAU : Audit Log Model (Pour la traçabilité)
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  action      String   // ex: "UPDATE_PRICE", "ASSIGN_MAID", "DELETE_REQUEST"
+  entity      String   // ex: "ServiceRequest", "Maid", "Settings"
+  entityId    Int      // L'ID de l'élément modifié (ex: 12)
+  details     String   // ex: "Le prix de la mission est passé de 50 à 10 TND"
+  createdAt   DateTime @default(now())
+
+  // Relation avec l'Admin (Optionnel au cas où une action est faite par le système sans admin connecté)
+  adminId     Int?     
+  admin       Admin?   @relation(fields: [adminId], references: [id])
 }

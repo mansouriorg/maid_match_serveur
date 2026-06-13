@@ -8,7 +8,8 @@ import {
   Param, 
   Delete, 
   ParseIntPipe, 
-  Query 
+  Query,
+  Request // <-- NOUVEL IMPORT ICI
 } from '@nestjs/common';
 import { ServiceRequestsService } from './service-requests.service';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
@@ -26,8 +27,6 @@ export class ServiceRequestsController {
 
   // 2. GET /service-requests
   // Used by: Admin Dashboard (List View) & Calendar Planning
-  // Usage List: /service-requests?status=REQUESTED&search=Ahmed
-  // Usage Calendar: /service-requests?minDate=2023-12-01&maxDate=2023-12-31
   @Get()
   findAll(
     @Query('status') status?: string,
@@ -63,9 +62,12 @@ export class ServiceRequestsController {
   @Patch(':id/status')
   updateStatus(
     @Param('id', ParseIntPipe) id: number, 
-    @Body('status') status: string
+    @Body('status') status: string,
+    @Request() req: any // <-- INJECTION DE LA REQUÊTE
   ) {
-    return this.serviceRequestsService.updateStatus(id, status);
+    // Récupération de l'ID Admin (fallback selon la configuration de ton JWT : sub ou id)
+    const adminId = req.user?.sub || req.user?.id;
+    return this.serviceRequestsService.updateStatus(id, status, adminId);
   }
 
   // 6. PATCH /service-requests/:id/assign
@@ -73,25 +75,33 @@ export class ServiceRequestsController {
   @Patch(':id/assign')
   assignMaid(
     @Param('id', ParseIntPipe) id: number,
-    @Body('maidId', ParseIntPipe) maidId: number
+    @Body('maidId', ParseIntPipe) maidId: number,
+    @Request() req: any // <-- INJECTION DE LA REQUÊTE
   ) {
-    return this.serviceRequestsService.assignMaid(id, maidId);
+    const adminId = req.user?.sub || req.user?.id;
+    return this.serviceRequestsService.assignMaid(id, maidId, adminId);
   }
 
-  // 7. NOUVEAU : PATCH /service-requests/:id
+  // 7. PATCH /service-requests/:id
   // Used by: Admin (Update general fields like paymentStatus)
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
-    @Body() updateData: any
+    @Body() updateData: any,
+    @Request() req: any // <-- INJECTION DE LA REQUÊTE
   ) {
-    return this.serviceRequestsService.update(id, updateData);
+    const adminId = req.user?.sub || req.user?.id;
+    return this.serviceRequestsService.update(id, updateData, adminId);
   }
 
   // 8. DELETE /service-requests/:id
   // Used by: Admin (Remove spam or cancelled requests)
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.serviceRequestsService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any // <-- INJECTION DE LA REQUÊTE
+  ) {
+    const adminId = req.user?.sub || req.user?.id;
+    return this.serviceRequestsService.remove(id, adminId);
   }
 }
