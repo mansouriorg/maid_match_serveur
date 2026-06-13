@@ -1,3 +1,4 @@
+// src/modules/service-requests/service-requests.service.ts
 import { 
   Injectable, 
   NotFoundException, 
@@ -5,16 +6,41 @@ import {
 } from '@nestjs/common';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotificationsService } from '../notifications/notifications.service'; // <-- Import du service
+import { NotificationsService } from '../notifications/notifications.service'; 
 
 @Injectable()
 export class ServiceRequestsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notificationsService: NotificationsService // <-- Injection ici
+    private readonly notificationsService: NotificationsService 
   ) {}
 
-  // 1. Create a new request (Updated for Admin Manual Entry & Notifications)
+  // --- NOUVEAU : Fonction privée pour calculer le prix ---
+  private calculatePrice(dto: CreateServiceRequestDto): number {
+    let pricePerHour = 15; // Prix de base : 15 TND/h
+
+    // 1. Majoration si c'est un nettoyage en profondeur
+    if (dto.cleaningType === 'deep') {
+      pricePerHour += 5; // Passe à 20 TND/h
+    }
+
+    // 2. Calcul du prix de base (Heures * Prix horaire)
+    let total = dto.durationHours * pricePerHour;
+
+    // 3. Frais si la femme de ménage doit ramener ses produits
+    if (dto.hasSupplies === false) {
+      total += 20; // + 20 TND de frais fixes
+    }
+
+    // 4. Frais pour les extras (ex: 10 TND par extra)
+    if (dto.extras && dto.extras.length > 0) {
+      total += (dto.extras.length * 10); 
+    }
+
+    return total;
+  }
+
+  // 1. Create a new request (Updated with Automatic Price Calculation)
   async create(createDto: CreateServiceRequestDto) {
     // Logic: Determine initial status
     let initialStatus = createDto.status || 'REQUESTED';
@@ -22,6 +48,9 @@ export class ServiceRequestsService {
     if (createDto.maidId) {
       initialStatus = 'ASSIGNED';
     }
+
+    // CALCUL DU PRIX EXACT ICI
+    const finalPrice = this.calculatePrice(createDto);
 
     let newRequest;
 
@@ -34,6 +63,7 @@ export class ServiceRequestsService {
                     ...createDto,
                     startTime: new Date(createDto.startTime),
                     status: initialStatus,
+                    totalPrice: finalPrice, // <-- Sauvegarde du prix calculé
                 },
             });
 
@@ -52,13 +82,12 @@ export class ServiceRequestsService {
             ...createDto,
             startTime: new Date(createDto.startTime),
             status: initialStatus,
+            totalPrice: finalPrice, // <-- Sauvegarde du prix calculé
           },
         });
     }
 
     // 🔥 Déclenchement de la notification (Email + WebSocket) 🔥
-    // L'utilisation du .catch() permet de ne pas faire planter la création de 
-    // la requête si jamais le service de notification rencontre un problème.
     this.notificationsService.notifyAdminNewRequest(newRequest).catch((err) => {
       console.error('Erreur lors de l\'envoi de la notification :', err);
     });
@@ -97,7 +126,6 @@ export class ServiceRequestsService {
         }),
       },
       // D. Sorting
-      // If we are filtering by date (Calendar), sort by StartTime. Otherwise by Newest.
       orderBy: (minDate && maxDate) ? { startTime: 'asc' } : { createdAt: 'desc' },
       include: { maid: true },
     });
@@ -179,10 +207,58 @@ export class ServiceRequestsService {
 
   // 6. Delete a request (Used for cleanup/spam)
   async remove(id: number) {
-    await this.findOne(id); // Ensure it exists before trying to delete
+    await this.findOne(id); 
 
     return this.prisma.serviceRequest.delete({
       where: { id },
     });
+  }
+
+  // 7. Mettre à jour les statistiques pour utiliser le VRAI prix
+  async getAnalytics() {
+    // A. Total des réservations
+    const totalRequests = await this.prisma.serviceRequest.count();
+
+    // B. Répartition par statut
+    const statusCounts = await this.prisma.serviceRequest.groupBy({
+      by: ['status'],
+      _count: {
+        status: true,
+      },
+    });
+
+    // C. Revenu EXACT basé sur la nouvelle colonne totalPrice
+    const revenueResult = await this.prisma.serviceRequest.aggregate({
+      _sum: {
+        durationHours: true,
+        totalPrice: true, // <-- Prisma additionne tous les prix totaux !
+      },
+      where: {
+        status: {
+          not: 'CANCELLED', // On ne compte pas l'argent des réservations annulées
+        },
+      },
+    });
+    
+    const totalHours = revenueResult._sum.durationHours || 0;
+    const estimatedRevenue = revenueResult._sum.totalPrice || 0; // Revenu exact !
+
+    // D. Formater les données pour le frontend
+    const formattedStatusCounts = statusCounts.reduce((acc, curr) => {
+      acc[curr.status] = curr._count.status;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalRequests,
+      statusCounts: {
+        requested: formattedStatusCounts['REQUESTED'] || 0,
+        assigned: formattedStatusCounts['ASSIGNED'] || 0,
+        completed: formattedStatusCounts['COMPLETED'] || 0,
+        cancelled: formattedStatusCounts['CANCELLED'] || 0,
+      },
+      totalHours,
+      estimatedRevenue,
+    };
   }
 }

@@ -46,6 +46,9 @@ model ServiceRequest {
   // Relation: Link a Maid to this request (Optional until assigned)
   maidId        Int?
   maid          Maid?    @relation(fields: [maidId], references: [id])
+
+  // NOUVEAU : Le prix total calculé pour la réservation
+  totalPrice    Float    @default(0.0)
 }
 
 // 2. ENHANCED Maid Model

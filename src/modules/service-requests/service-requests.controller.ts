@@ -1,3 +1,4 @@
+// src/modules/service-requests/service-requests.controller.ts
 import { 
   Controller, 
   Get, 
@@ -43,14 +44,22 @@ export class ServiceRequestsController {
     });
   }
 
-  // 3. GET /service-requests/:id
+  // 3. NOUVEAU : GET /service-requests/analytics
+  // Used by: Admin Dashboard (Stats Cards)
+  // ⚠️ DOIT TOUJOURS ÊTRE AVANT @Get(':id')
+  @Get('analytics')
+  async getAnalytics() {
+    return this.serviceRequestsService.getAnalytics();
+  }
+
+  // 4. GET /service-requests/:id
   // Used by: Admin Dashboard (Detail View)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.serviceRequestsService.findOne(id);
   }
 
-  // 4. PATCH /service-requests/:id/status
+  // 5. PATCH /service-requests/:id/status
   // Used by: Admin (Mark as "CONFIRMED", "COMPLETED" or "CANCELLED")
   @Patch(':id/status')
   updateStatus(
@@ -60,7 +69,7 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.updateStatus(id, status);
   }
 
-  // 5. PATCH /service-requests/:id/assign
+  // 6. PATCH /service-requests/:id/assign
   // Used by: Admin (Assign a Maid to a Request)
   // Usage: PATCH /service-requests/1/assign { "maidId": 5 }
   @Patch(':id/assign')
@@ -71,7 +80,7 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.assignMaid(id, maidId);
   }
 
-  // 6. DELETE /service-requests/:id
+  // 7. DELETE /service-requests/:id
   // Used by: Admin (Remove spam or cancelled requests)
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
