@@ -7,7 +7,8 @@ import {
   Min, 
   IsEmail, 
   IsBoolean, 
-  IsArray 
+  IsArray,
+  IsNumber // <-- NOUVEL IMPORT ICI
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -36,12 +37,12 @@ export class CreateServiceRequestDto {
 
   @IsInt()
   @Min(1)
-  @Type(() => Number) // ✅ Auto-convert "3" to 3
+  @Type(() => Number) // Auto-convert "3" to 3
   rooms: number;
 
   @IsInt()
   @Min(1)
-  @Type(() => Number) // ✅ Auto-convert "1" to 1
+  @Type(() => Number) // Auto-convert "1" to 1
   bathrooms: number;
 
   @IsString()
@@ -49,7 +50,7 @@ export class CreateServiceRequestDto {
   cleaningType: string; // e.g. "standard", "deep"
 
   @IsBoolean()
-  @Type(() => Boolean) // ✅ Auto-convert "true" string to boolean
+  @Type(() => Boolean) // Auto-convert "true" string to boolean
   hasSupplies: boolean;
 
   @IsArray()
@@ -64,21 +65,30 @@ export class CreateServiceRequestDto {
 
   @IsInt()
   @Min(1)
-  @Type(() => Number) // ✅ Auto-convert "4" to 4
+  @Type(() => Number) // Auto-convert "4" to 4
   durationHours: number;
 
   @IsString()
   @IsNotEmpty()
   frequency: string; // e.g. "one-time", "weekly"
 
-  // --- Admin / System Fields (NEW) ---
-
+  // --- Admin / System Fields ---
   @IsOptional()
   @IsString()
   status?: string; // Allows Admin to create "CONFIRMED" or "ASSIGNED" directly
 
   @IsOptional()
   @IsInt()
-  @Type(() => Number) // ✅ Auto-convert "5" to 5
+  @Type(() => Number)
   maidId?: number; // Allows Admin to immediately assign a maid
+
+  // --- NOUVEAUX CHAMPS FINANCIERS ---
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number) // Sécurité : convertit une string "75" en nombre 75
+  totalPrice?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentStatus?: string; // e.g. "PENDING", "PAID"
 }

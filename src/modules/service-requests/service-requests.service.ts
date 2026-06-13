@@ -44,34 +44,33 @@ export class ServiceRequestsService {
     return total;
   }
 
-  // 1. Create a new request (Updated with Dynamic Price Calculation)
+  // 1. Create a new request (Updated with Dynamic Price & Payment Status)
   async create(createDto: CreateServiceRequestDto) {
-    // Logic: Determine initial status
     let initialStatus = createDto.status || 'REQUESTED';
 
     if (createDto.maidId) {
       initialStatus = 'ASSIGNED';
     }
 
-    // CALCUL DU PRIX EXACT ICI (Avec await car on interroge la BDD)
-    const finalPrice = await this.calculatePrice(createDto);
+    // CALCUL DU PRIX EXACT ICI
+    const finalPrice = createDto.totalPrice || await this.calculatePrice(createDto);
+    // On prend le statut de paiement s'il est envoyé, sinon c'est PENDING par défaut.
+    const paymentStat = createDto.paymentStatus || 'PENDING';
 
     let newRequest;
 
-    // Use a transaction if we are assigning a maid immediately to ensure consistency
     if (createDto.maidId) {
         newRequest = await this.prisma.$transaction(async (tx) => {
-            // A. Create the Request
             const request = await tx.serviceRequest.create({
                 data: {
                     ...createDto,
                     startTime: new Date(createDto.startTime),
                     status: initialStatus,
-                    totalPrice: finalPrice, // <-- Sauvegarde du prix calculé
+                    totalPrice: finalPrice, 
+                    paymentStatus: paymentStat, // NOUVEAU
                 },
             });
 
-            // B. Mark Maid as BUSY
             await tx.maid.update({
                 where: { id: createDto.maidId },
                 data: { status: 'BUSY' }
@@ -80,18 +79,17 @@ export class ServiceRequestsService {
             return request;
         });
     } else {
-        // Standard Creation (No Maid assigned yet)
         newRequest = await this.prisma.serviceRequest.create({
           data: {
             ...createDto,
             startTime: new Date(createDto.startTime),
             status: initialStatus,
-            totalPrice: finalPrice, // <-- Sauvegarde du prix calculé
+            totalPrice: finalPrice, 
+            paymentStatus: paymentStat, // NOUVEAU
           },
         });
     }
 
-    // 🔥 Déclenchement de la notification (Email + WebSocket) 🔥
     this.notificationsService.notifyAdminNewRequest(newRequest).catch((err) => {
       console.error('Erreur lors de l\'envoi de la notification :', err);
     });
@@ -99,7 +97,7 @@ export class ServiceRequestsService {
     return newRequest;
   }
 
-  // 2. Get all requests (Supports Search, Status & Date Range for Planning)
+  // 2. Get all requests
   async findAll(params?: { 
     status?: string; 
     search?: string; 
@@ -110,18 +108,13 @@ export class ServiceRequestsService {
 
     return this.prisma.serviceRequest.findMany({
       where: {
-        // A. Filter by Status (if provided)
         ...(status && { status }),
-
-        // B. Filter by Date Range (For Calendar/Planning)
         ...(minDate && maxDate ? {
             startTime: {
-                gte: new Date(minDate), // Start of range
-                lte: new Date(maxDate), // End of range
+                gte: new Date(minDate), 
+                lte: new Date(maxDate), 
             }
         } : {}),
-        
-        // C. Search by Name OR Phone (if provided)
         ...(search && {
           OR: [
             { customerName: { contains: search, mode: 'insensitive' } },
@@ -129,13 +122,12 @@ export class ServiceRequestsService {
           ],
         }),
       },
-      // D. Sorting
       orderBy: (minDate && maxDate) ? { startTime: 'asc' } : { createdAt: 'desc' },
       include: { maid: true },
     });
   }
 
-  // 3. Get ONE request by ID (Used for Detail View)
+  // 3. Get ONE request by ID
   async findOne(id: number) {
     const request = await this.prisma.serviceRequest.findUnique({
       where: { id },
@@ -149,21 +141,17 @@ export class ServiceRequestsService {
     return request;
   }
 
-  // 4. Update Status (With Smart Logic)
+  // 4. Update Status (Workflow)
   async updateStatus(id: number, status: string) {
     const request = await this.findOne(id);
 
-    // Transaction: Update request AND Update Maid status together
     return this.prisma.$transaction(async (tx) => {
-      
-      // A. Update the Request Status
       const updatedRequest = await tx.serviceRequest.update({
         where: { id },
         data: { status },
         include: { maid: true }
       });
 
-      // B. If the job is finished/cancelled, set the maid back to AVAILABLE
       if (['COMPLETED', 'CANCELLED', 'REJECTED'].includes(status) && request.maidId) {
         await tx.maid.update({
           where: { id: request.maidId },
@@ -175,29 +163,23 @@ export class ServiceRequestsService {
     });
   }
 
-  // 5. Assign a Maid to a Request (With Validation & Transaction)
+  // 5. Assign a Maid
   async assignMaid(requestId: number, maidId: number) {
-    // A. Check if Request exists
     await this.findOne(requestId);
 
-    // B. Check if Maid exists
     const maid = await this.prisma.maid.findUnique({ where: { id: maidId } });
     if (!maid) throw new NotFoundException(`Maid #${maidId} not found`);
 
-    // C. Check if Maid is already busy
     if (maid.status === 'BUSY') {
        throw new ConflictException(`Maid ${maid.fullName} is currently busy with another mission.`);
     }
 
-    // D. Perform updates in a Transaction (All or Nothing)
     return this.prisma.$transaction(async (tx) => {
-      // 1. Mark Maid as BUSY
       await tx.maid.update({
         where: { id: maidId },
         data: { status: 'BUSY' },
       });
 
-      // 2. Link Maid to Request and update status to ASSIGNED
       return tx.serviceRequest.update({
         where: { id: requestId },
         data: {
@@ -209,7 +191,19 @@ export class ServiceRequestsService {
     });
   }
 
-  // 6. Delete a request (Used for cleanup/spam)
+  // 6. NOUVEAU : Update General Fields (For Payment Status changes)
+  async update(id: number, updateData: any) {
+    await this.findOne(id);
+
+    // On utilise updateData qui peut contenir { paymentStatus: 'PAID' }
+    return this.prisma.serviceRequest.update({
+      where: { id },
+      data: updateData,
+      include: { maid: true }
+    });
+  }
+
+  // 7. Delete a request
   async remove(id: number) {
     await this.findOne(id); 
 
@@ -218,12 +212,10 @@ export class ServiceRequestsService {
     });
   }
 
-  // 7. Mettre à jour les statistiques pour utiliser le VRAI prix
+  // 8. Analytics
   async getAnalytics() {
-    // A. Total des réservations
     const totalRequests = await this.prisma.serviceRequest.count();
 
-    // B. Répartition par statut
     const statusCounts = await this.prisma.serviceRequest.groupBy({
       by: ['status'],
       _count: {
@@ -232,22 +224,36 @@ export class ServiceRequestsService {
     });
 
     // C. Revenu EXACT basé sur la nouvelle colonne totalPrice
-    const revenueResult = await this.prisma.serviceRequest.aggregate({
-      _sum: {
-        durationHours: true,
-        totalPrice: true, 
-      },
-      where: {
-        status: {
-          not: 'CANCELLED', // On ne compte pas l'argent des réservations annulées
+    // NOUVEAU : On ajoute aussi les revenus ENCAISSÉS vs ATTENDUS
+    const revenueResult = await this.prisma.serviceRequest.groupBy({
+        by: ['paymentStatus'],
+        _sum: {
+          durationHours: true,
+          totalPrice: true, 
         },
-      },
+        where: {
+          status: {
+            not: 'CANCELLED', 
+          },
+        },
     });
-    
-    const totalHours = revenueResult._sum.durationHours || 0;
-    const estimatedRevenue = revenueResult._sum.totalPrice || 0; 
+      
+    // Calcul de l'argent total estimé
+    let estimatedRevenue = 0;
+    // Calcul de l'argent réellement encaissé (PAID)
+    let collectedRevenue = 0;
+    let totalHours = 0;
 
-    // D. Formater les données pour le frontend
+    revenueResult.forEach((group) => {
+        const sum = group._sum.totalPrice || 0;
+        estimatedRevenue += sum;
+        totalHours += group._sum.durationHours || 0;
+        
+        if (group.paymentStatus === 'PAID') {
+            collectedRevenue += sum;
+        }
+    });
+
     const formattedStatusCounts = statusCounts.reduce((acc, curr) => {
       acc[curr.status] = curr._count.status;
       return acc;
@@ -263,6 +269,7 @@ export class ServiceRequestsService {
       },
       totalHours,
       estimatedRevenue,
+      collectedRevenue // Optionnel : l'argent réellement dans ta poche !
     };
   }
 }

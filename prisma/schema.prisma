@@ -47,8 +47,9 @@ model ServiceRequest {
   maidId        Int?
   maid          Maid?    @relation(fields: [maidId], references: [id])
 
-  // Le prix total calculé pour la réservation
+  // --- NOUVEAUX CHAMPS DE FACTURATION ---
   totalPrice    Float    @default(0.0)
+  paymentStatus String   @default("PENDING")   // PENDING, PAID, REFUNDED
 }
 
 // 2. ENHANCED Maid Model

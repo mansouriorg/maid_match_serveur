@@ -32,10 +32,9 @@ export class ServiceRequestsController {
   findAll(
     @Query('status') status?: string,
     @Query('search') search?: string,
-    @Query('minDate') minDate?: string, // NEW: Start of calendar range
-    @Query('maxDate') maxDate?: string, // NEW: End of calendar range
+    @Query('minDate') minDate?: string, // Start of calendar range
+    @Query('maxDate') maxDate?: string, // End of calendar range
   ) {
-    // Pass all filters to the updated service
     return this.serviceRequestsService.findAll({ 
       status, 
       search, 
@@ -44,7 +43,7 @@ export class ServiceRequestsController {
     });
   }
 
-  // 3. NOUVEAU : GET /service-requests/analytics
+  // 3. GET /service-requests/analytics
   // Used by: Admin Dashboard (Stats Cards)
   // ⚠️ DOIT TOUJOURS ÊTRE AVANT @Get(':id')
   @Get('analytics')
@@ -71,7 +70,6 @@ export class ServiceRequestsController {
 
   // 6. PATCH /service-requests/:id/assign
   // Used by: Admin (Assign a Maid to a Request)
-  // Usage: PATCH /service-requests/1/assign { "maidId": 5 }
   @Patch(':id/assign')
   assignMaid(
     @Param('id', ParseIntPipe) id: number,
@@ -80,7 +78,17 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.assignMaid(id, maidId);
   }
 
-  // 7. DELETE /service-requests/:id
+  // 7. NOUVEAU : PATCH /service-requests/:id
+  // Used by: Admin (Update general fields like paymentStatus)
+  @Patch(':id')
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateData: any
+  ) {
+    return this.serviceRequestsService.update(id, updateData);
+  }
+
+  // 8. DELETE /service-requests/:id
   // Used by: Admin (Remove spam or cancelled requests)
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
