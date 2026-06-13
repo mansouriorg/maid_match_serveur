@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { UpdateSettingsDto } from './dto/update-settings.dto';
 
 @Injectable()
 export class SettingsService {
@@ -15,16 +16,20 @@ export class SettingsService {
     return settings;
   }
 
-  async updateSettings(data: any) {
-    // Assure-toi que defaultHourlyRate est bien sauvegardé comme un nombre (Float)
-    if (data.defaultHourlyRate) {
-      data.defaultHourlyRate = parseFloat(data.defaultHourlyRate);
+  async updateSettings(data: UpdateSettingsDto) {
+    // 1. On crée une copie propre des données validées
+    const updatePayload: any = { ...data };
+
+    // 2. Conversion sécurisée du taux horaire (s'il est présent dans la requête)
+    if (updatePayload.defaultHourlyRate !== undefined) {
+      updatePayload.defaultHourlyRate = parseFloat(updatePayload.defaultHourlyRate.toString());
     }
 
+    // 3. Mise à jour en base de données
     return this.prisma.settings.upsert({
       where: { id: 1 },
-      update: data,
-      create: { id: 1, ...data }, // Fallback au cas où
+      update: updatePayload,
+      create: { id: 1, ...updatePayload }, // Fallback au cas où la ligne n'existe pas encore
     });
   }
 }
