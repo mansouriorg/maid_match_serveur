@@ -47,7 +47,7 @@ model ServiceRequest {
   maidId        Int?
   maid          Maid?    @relation(fields: [maidId], references: [id])
 
-  // NOUVEAU : Le prix total calculé pour la réservation
+  // Le prix total calculé pour la réservation
   totalPrice    Float    @default(0.0)
 }
 
@@ -96,6 +96,20 @@ model Notification {
   isRead           Boolean  @default(false)
   createdAt        DateTime @default(now())
   
-  // NEW: Save the ID of the related request so we can click on it!
+  // Save the ID of the related request so we can click on it!
   serviceRequestId Int?     
+}
+
+// 5. NEW Settings Model (Global Configuration)
+model Settings {
+  id                Int      @id @default(1)
+  firstName         String   @default("Mahmoud")
+  lastName          String   @default("Mansouri")
+  email             String   @default("admin@nobreach.com")
+  companyName       String   @default("No Breach")
+  contactPhone      String   @default("+216 55 123 456")
+  defaultHourlyRate Float    @default(15.0)
+  emailAlerts       Boolean  @default(true)
+  smsAlerts         Boolean  @default(false)
+  updatedAt         DateTime @updatedAt
 }

@@ -10,8 +10,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ServiceRequestsModule } from './modules/service-requests/service-requests.module';
 import { MaidsModule } from './modules/maids/maids.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { AdminDashboardModule } from './modules/admin-dashboard/admin-dashboard.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { SettingsModule } from './modules/settings/settings.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -27,8 +28,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     ServiceRequestsModule,
     MaidsModule,
     AuthModule,
-    AdminDashboardModule,
+    SettingsModule,
     NotificationsModule,
+    AdminModule
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -15,24 +15,28 @@ export class ServiceRequestsService {
     private readonly notificationsService: NotificationsService 
   ) {}
 
-  // --- NOUVEAU : Fonction privée pour calculer le prix ---
-  private calculatePrice(dto: CreateServiceRequestDto): number {
-    let pricePerHour = 15; // Prix de base : 15 TND/h
+  // --- NOUVEAU : Fonction privée ASYNCHRONE pour calculer le prix depuis la BDD ---
+  private async calculatePrice(dto: CreateServiceRequestDto): Promise<number> {
+    // 1. On récupère les paramètres dynamiques depuis la base de données
+    const settings = await this.prisma.settings.findUnique({ where: { id: 1 } });
+    
+    // 2. On utilise le tarif défini par l'admin, ou 15 en solution de secours
+    let pricePerHour = settings?.defaultHourlyRate || 15; 
 
-    // 1. Majoration si c'est un nettoyage en profondeur
+    // 3. Majoration si c'est un nettoyage en profondeur
     if (dto.cleaningType === 'deep') {
-      pricePerHour += 5; // Passe à 20 TND/h
+      pricePerHour += 5; 
     }
 
-    // 2. Calcul du prix de base (Heures * Prix horaire)
+    // 4. Calcul du prix de base (Heures * Prix horaire dynamique)
     let total = dto.durationHours * pricePerHour;
 
-    // 3. Frais si la femme de ménage doit ramener ses produits
+    // 5. Frais si la femme de ménage doit ramener ses produits
     if (dto.hasSupplies === false) {
-      total += 20; // + 20 TND de frais fixes
+      total += 20; 
     }
 
-    // 4. Frais pour les extras (ex: 10 TND par extra)
+    // 6. Frais pour les extras (ex: 10 TND par extra)
     if (dto.extras && dto.extras.length > 0) {
       total += (dto.extras.length * 10); 
     }
@@ -40,7 +44,7 @@ export class ServiceRequestsService {
     return total;
   }
 
-  // 1. Create a new request (Updated with Automatic Price Calculation)
+  // 1. Create a new request (Updated with Dynamic Price Calculation)
   async create(createDto: CreateServiceRequestDto) {
     // Logic: Determine initial status
     let initialStatus = createDto.status || 'REQUESTED';
@@ -49,8 +53,8 @@ export class ServiceRequestsService {
       initialStatus = 'ASSIGNED';
     }
 
-    // CALCUL DU PRIX EXACT ICI
-    const finalPrice = this.calculatePrice(createDto);
+    // CALCUL DU PRIX EXACT ICI (Avec await car on interroge la BDD)
+    const finalPrice = await this.calculatePrice(createDto);
 
     let newRequest;
 
@@ -231,7 +235,7 @@ export class ServiceRequestsService {
     const revenueResult = await this.prisma.serviceRequest.aggregate({
       _sum: {
         durationHours: true,
-        totalPrice: true, // <-- Prisma additionne tous les prix totaux !
+        totalPrice: true, 
       },
       where: {
         status: {
@@ -241,7 +245,7 @@ export class ServiceRequestsService {
     });
     
     const totalHours = revenueResult._sum.durationHours || 0;
-    const estimatedRevenue = revenueResult._sum.totalPrice || 0; // Revenu exact !
+    const estimatedRevenue = revenueResult._sum.totalPrice || 0; 
 
     // D. Formater les données pour le frontend
     const formattedStatusCounts = statusCounts.reduce((acc, curr) => {
