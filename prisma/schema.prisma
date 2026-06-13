@@ -15,6 +15,7 @@ datasource db {
   provider = "postgresql"
 }
 
+// 1. Service Request Model
 model ServiceRequest {
   id            Int      @id @default(autoincrement())
   createdAt     DateTime @default(now())
@@ -47,7 +48,6 @@ model ServiceRequest {
   maid          Maid?    @relation(fields: [maidId], references: [id])
 }
 
-// 2. NEW Maid Model (For your future dispatching)
 // 2. ENHANCED Maid Model
 model Maid {
   id              Int              @id @default(autoincrement())
@@ -82,5 +82,14 @@ model Admin {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   password  String   // Will store hashed password
+  createdAt DateTime @default(now())
+}
+
+// 4. NEW Notification Model (For Dashboard Real-time Alerts)
+model Notification {
+  id        Int      @id @default(autoincrement())
+  title     String
+  message   String
+  isRead    Boolean  @default(false) // Non lu par défaut
   createdAt DateTime @default(now())
 }

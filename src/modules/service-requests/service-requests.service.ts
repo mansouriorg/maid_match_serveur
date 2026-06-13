@@ -1,30 +1,33 @@
 import { 
   Injectable, 
   NotFoundException, 
-  BadRequestException, 
   ConflictException 
 } from '@nestjs/common';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service'; // <-- Import du service
 
 @Injectable()
 export class ServiceRequestsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService // <-- Injection ici
+  ) {}
 
-  // 1. Create a new request (Updated for Admin Manual Entry)
+  // 1. Create a new request (Updated for Admin Manual Entry & Notifications)
   async create(createDto: CreateServiceRequestDto) {
     // Logic: Determine initial status
-    // If maidId is provided, force status to ASSIGNED.
-    // Otherwise use provided status (e.g. CONFIRMED) or default to REQUESTED.
     let initialStatus = createDto.status || 'REQUESTED';
 
     if (createDto.maidId) {
       initialStatus = 'ASSIGNED';
     }
 
+    let newRequest;
+
     // Use a transaction if we are assigning a maid immediately to ensure consistency
     if (createDto.maidId) {
-        return this.prisma.$transaction(async (tx) => {
+        newRequest = await this.prisma.$transaction(async (tx) => {
             // A. Create the Request
             const request = await tx.serviceRequest.create({
                 data: {
@@ -42,16 +45,25 @@ export class ServiceRequestsService {
 
             return request;
         });
+    } else {
+        // Standard Creation (No Maid assigned yet)
+        newRequest = await this.prisma.serviceRequest.create({
+          data: {
+            ...createDto,
+            startTime: new Date(createDto.startTime),
+            status: initialStatus,
+          },
+        });
     }
 
-    // Standard Creation (No Maid assigned yet)
-    return this.prisma.serviceRequest.create({
-      data: {
-        ...createDto,
-        startTime: new Date(createDto.startTime),
-        status: initialStatus,
-      },
+    // 🔥 Déclenchement de la notification (Email + WebSocket) 🔥
+    // L'utilisation du .catch() permet de ne pas faire planter la création de 
+    // la requête si jamais le service de notification rencontre un problème.
+    this.notificationsService.notifyAdminNewRequest(newRequest).catch((err) => {
+      console.error('Erreur lors de l\'envoi de la notification :', err);
     });
+
+    return newRequest;
   }
 
   // 2. Get all requests (Supports Search, Status & Date Range for Planning)
@@ -106,7 +118,6 @@ export class ServiceRequestsService {
   }
 
   // 4. Update Status (With Smart Logic)
-  // Logic: If job is 'COMPLETED' or 'CANCELLED', free up the maid automatically.
   async updateStatus(id: number, status: string) {
     const request = await this.findOne(id);
 
