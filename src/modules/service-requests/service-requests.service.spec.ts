@@ -327,6 +327,34 @@ describe('ServiceRequestsService', () => {
     });
   });
 
+  describe('price estimate', () => {
+    it('uses the hourly rate from the settings', async () => {
+      prismaFake.settings.findUnique.mockResolvedValue({
+        defaultHourlyRate: 20,
+      });
+      const choices = {
+        cleaningType: 'deep',
+        durationHours: 3,
+        hasSupplies: false,
+        extras: ['ironing'],
+      };
+      // (20 + 5) x 3 hours + 20 without supplies + 10 for one option
+      await expect(service.quote(choices)).resolves.toEqual({
+        totalPrice: 105,
+      });
+    });
+
+    it('gives the same price as the one saved with the booking', async () => {
+      prismaFake.settings.findUnique.mockResolvedValue({
+        defaultHourlyRate: 22,
+      });
+      const quoted = await service.quote(visitorDto);
+      await service.create(visitorDto);
+      const saved = prismaFake.serviceRequest.create.mock.calls[0][0].data;
+      expect(saved.totalPrice).toBe(quoted.totalPrice);
+    });
+  });
+
   it('lets a logged-in admin choose status, price and payment', async () => {
     const adminDto = {
       ...visitorDto,

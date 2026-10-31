@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ServiceRequestsService } from './service-requests.service';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
+import { QuoteDto } from './dto/quote.dto';
 import { Public } from '../auth/public.decorator';
 import { Throttle } from '@nestjs/throttler';
 
@@ -37,8 +38,17 @@ export class ServiceRequestsController {
     return this.serviceRequestsService.create(createDto, Boolean(req.user));
   }
 
-  // 2. GET /service-requests
-  // Admin only. Used by: dashboard list and calendar planning
+  // 1b. POST /service-requests/quote
+  // PUBLIC. Used by: booking wizard summary, to show the price the API will
+  // save with the booking. Nothing is saved.
+  @Public()
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Post('quote')
+  quote(@Body() quoteDto: QuoteDto) {
+    return this.serviceRequestsService.quote(quoteDto);
+  }
+
+  // 2. GET /service-requests  // Admin only. Used by: dashboard list and calendar planning
   @Get()
   findAll(
     @Query('status') status?: string,

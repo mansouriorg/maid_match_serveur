@@ -19,6 +19,14 @@ type UpdateInput = {
   internalNote?: unknown;
 };
 
+// What the price depends on (a booking, or a quote from the booking form).
+type PriceInput = {
+  cleaningType: string;
+  durationHours: number;
+  hasSupplies: boolean;
+  extras?: string[];
+};
+
 const HOUR_MS = 3600000;
 
 // How many days separate two jobs of a recurring booking.
@@ -115,7 +123,7 @@ export class ServiceRequestsService {
     private readonly auditService: AuditService,
   ) {}
 
-  private async calculatePrice(dto: CreateServiceRequestDto): Promise<number> {
+  private async calculatePrice(dto: PriceInput): Promise<number> {
     const settings = await this.prisma.settings.findUnique({
       where: { id: 1 },
     });
@@ -191,6 +199,12 @@ export class ServiceRequestsService {
       );
     }
     return maid;
+  }
+
+  // 0. Price estimate for the public booking form: the same formula and the
+  // same hourly rate as the price saved with a booking. Nothing is saved.
+  async quote(input: PriceInput) {
+    return { totalPrice: await this.calculatePrice(input) };
   }
 
   // 1. Create a new request

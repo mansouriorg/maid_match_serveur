@@ -106,6 +106,9 @@ be open.
   automatically: same Paris time 7 or 14 days later (clock changes included),
   same customer, options, price and note, payment PENDING. The same person is
   kept if they are free then; otherwise the new job waits as CONFIRMED.
+- `POST /service-requests/quote` (public, 30 per minute) returns the price for
+  a cleaning type, duration, supplies and options, with the same formula and
+  hourly rate as the price saved with a booking. The booking form shows it.
 
 ## Data model
 
