@@ -1,13 +1,21 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // 1. Security headers (helmet)
   app.use(helmet());
+
+  // Behind a reverse proxy (most hosting services) every request seems to come
+  // from the proxy. Set TRUST_PROXY=1 there, so the request limits count each
+  // visitor separately (their address is in the X-Forwarded-For header).
+  if (process.env.TRUST_PROXY === '1') {
+    app.set('trust proxy', 1);
+  }
 
   // 2. Global validation: the @IsString(), @IsInt() ... rules of the DTOs
   app.useGlobalPipes(

@@ -13,6 +13,7 @@ import {
 import { ServiceRequestsService } from './service-requests.service';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
 import { Public } from '../auth/public.decorator';
+import { Throttle } from '@nestjs/throttler';
 
 // What the login token gives us (see JwtStrategy.validate).
 type AuthedRequest = { user?: { userId?: number } };
@@ -26,6 +27,8 @@ export class ServiceRequestsController {
   // 1. POST /service-requests
   // PUBLIC. Used by: booking wizard on the public site (StepSummary)
   @Public()
+  // At most 10 bookings every 10 minutes from one address (anti spam).
+  @Throttle({ default: { limit: 10, ttl: 600000 } })
   @Post()
   create(
     @Body() createDto: CreateServiceRequestDto,

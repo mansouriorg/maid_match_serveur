@@ -44,6 +44,9 @@ This is one of three projects that work together:
 - WebSocket connections need the admin token, and new bookings are announced
   only to logged-in admins.
 - Admin changes such as prices and assignments are written to an audit log.
+- Request limits per address: 5 login attempts per minute, 10 bookings per
+  10 minutes, and 100 requests per minute overall. Behind a reverse proxy, set
+  `TRUST_PROXY=1` so each visitor is counted separately.
 
 ## Before the first start
 
@@ -127,7 +130,8 @@ reports.)
 ## Deploy
 
 Use Node.js 24.22.1 or newer. Set the same values as in `.env.example` on the
-server, with `CORS_ORIGINS` listing your real sites, then:
+server, with `CORS_ORIGINS` listing your real sites and `TRUST_PROXY=1` behind
+a reverse proxy, then:
 
     pnpm install --frozen-lockfile
     pnpm exec prisma generate
