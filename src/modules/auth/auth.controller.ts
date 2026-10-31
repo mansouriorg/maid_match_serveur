@@ -1,6 +1,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterAdminDto } from './dto/register-admin.dto';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from './public.decorator';
 
@@ -20,7 +21,7 @@ export class AuthController {
   // POST http://localhost:3000/auth/register-admin
   // Needs an admin token: only a logged-in admin can create another admin.
   @Post('register-admin')
-  register(@Body() loginDto: LoginDto) {
+  register(@Body() loginDto: RegisterAdminDto) {
     return this.authService.registerAdmin(loginDto);
   }
 }

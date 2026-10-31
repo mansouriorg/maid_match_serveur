@@ -107,11 +107,11 @@ model Notification {
 // 5. NEW Settings Model (Global Configuration)
 model Settings {
   id                Int      @id @default(1)
-  firstName         String   @default("Mahmoud")
-  lastName          String   @default("Mansouri")
-  email             String   @default("admin@nobreach.com")
-  companyName       String   @default("No Breach")
-  contactPhone      String   @default("+216 55 123 456")
+  firstName         String   @default("") // first name, set in the admin
+  lastName          String   @default("") // last name, set in the admin
+  email             String   @default("contact@example.com")
+  companyName       String   @default("MaidMatch")
+  contactPhone      String   @default("") // phone, set in the admin
   defaultHourlyRate Float    @default(15.0)
   emailAlerts       Boolean  @default(true)
   smsAlerts         Boolean  @default(false)
