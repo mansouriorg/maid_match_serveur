@@ -102,6 +102,10 @@ be open.
 - Admins can keep an internal note on a booking (`internalNote` in
   `PATCH /service-requests/:id`, 2000 characters at most). Customers never see
   it, and the audit log records that it changed, not its text.
+- When a weekly or every-2-weeks booking is completed, the next one is created
+  automatically: same Paris time 7 or 14 days later (clock changes included),
+  same customer, options, price and note, payment PENDING. The same person is
+  kept if they are free then; otherwise the new job waits as CONFIRMED.
 
 ## Data model
 

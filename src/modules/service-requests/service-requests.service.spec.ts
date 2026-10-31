@@ -254,6 +254,79 @@ describe('ServiceRequestsService', () => {
     });
   });
 
+  describe('recurring bookings', () => {
+    const recurring = (frequency: string, maidId: number | null) => ({
+      id: 1,
+      status: 'ASSIGNED',
+      frequency,
+      maidId,
+      maid: null,
+      customerName: 'Ada',
+      customerEmail: 'ada@example.com',
+      customerPhone: '07 00 00 00 01',
+      address: '1 rue de Paris, 75001 Paris',
+      propertyType: 'apartment',
+      rooms: 2,
+      bathrooms: 1,
+      cleaningType: 'standard',
+      hasSupplies: true,
+      extras: [],
+      startTime: new Date('2026-12-01T08:00:00.000Z'),
+      durationHours: 3,
+      totalPrice: 60,
+      paymentStatus: 'PAID',
+      internalNote: 'Code porte 1234',
+    });
+
+    it('creates the next weekly job, with the same person if free', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        recurring('weekly', 5),
+      );
+      prismaFake.serviceRequest.create.mockResolvedValue({ id: 77 });
+
+      const result = await service.updateStatus(1, 'COMPLETED');
+
+      expect(result).toMatchObject({ nextRequestId: 77 });
+      const data = prismaFake.serviceRequest.create.mock.calls[0][0].data;
+      expect(data.startTime.toISOString()).toBe('2026-12-08T08:00:00.000Z');
+      expect(data.status).toBe('ASSIGNED');
+      expect(data.maidId).toBe(5);
+      expect(data.paymentStatus).toBe('PENDING');
+      expect(data.internalNote).toBe('Code porte 1234');
+    });
+
+    it('leaves the next job waiting when the person is busy', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        recurring('bi-weekly', 5),
+      );
+      prismaFake.serviceRequest.findMany.mockResolvedValue([
+        {
+          id: 9,
+          startTime: new Date('2026-12-15T08:00:00.000Z'),
+          durationHours: 2,
+        },
+      ]);
+      prismaFake.serviceRequest.create.mockResolvedValue({ id: 78 });
+
+      await service.updateStatus(1, 'COMPLETED');
+
+      const data = prismaFake.serviceRequest.create.mock.calls[0][0].data;
+      expect(data.startTime.toISOString()).toBe('2026-12-15T08:00:00.000Z');
+      expect(data.status).toBe('CONFIRMED');
+      expect(data.maidId).toBeUndefined();
+    });
+
+    it('does not repeat a one-time booking', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        recurring('one-time', 5),
+      );
+
+      await service.updateStatus(1, 'COMPLETED');
+
+      expect(prismaFake.serviceRequest.create).not.toHaveBeenCalled();
+    });
+  });
+
   it('lets a logged-in admin choose status, price and payment', async () => {
     const adminDto = {
       ...visitorDto,

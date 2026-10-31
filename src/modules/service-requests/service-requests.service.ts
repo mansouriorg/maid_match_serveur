@@ -10,6 +10,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import type { ServiceRequest } from '../../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { addDaysInParis } from '../../common/paris-time';
 
 // What an admin may send to PATCH /service-requests/:id (the rest is ignored).
 type UpdateInput = {
@@ -19,6 +20,9 @@ type UpdateInput = {
 };
 
 const HOUR_MS = 3600000;
+
+// How many days separate two jobs of a recurring booking.
+const REPEAT_DAYS: Record<string, number> = { weekly: 7, 'bi-weekly': 14 };
 
 @Injectable()
 export class ServiceRequestsService {
@@ -333,7 +337,73 @@ export class ServiceRequestsService {
       adminId,
     );
 
+    // A recurring booking that is completed gets its next job: same Paris
+    // time, 7 or 14 days later, with the same person if they are free then.
+    const repeatDays = REPEAT_DAYS[request.frequency];
+    if (status === 'COMPLETED' && repeatDays !== undefined) {
+      const next = await this.createNextOccurrence(
+        request,
+        repeatDays,
+        adminId,
+      );
+      return { ...result, nextRequestId: next.id };
+    }
+
     return result;
+  }
+
+  // Creates the next job of a recurring booking (see updateStatus). It keeps
+  // the customer, the place, the options, the price and the internal note.
+  private async createNextOccurrence(
+    request: ServiceRequest,
+    repeatDays: number,
+    adminId?: number,
+  ) {
+    const startTime = addDaysInParis(request.startTime, repeatDays);
+    let maidId: number | undefined;
+    if (request.maidId !== null) {
+      try {
+        await this.checkMaidIsFree(
+          request.maidId,
+          startTime,
+          request.durationHours,
+        );
+        maidId = request.maidId;
+      } catch {
+        // Busy or on leave then: the next job waits for someone.
+        maidId = undefined;
+      }
+    }
+    const next = await this.prisma.serviceRequest.create({
+      data: {
+        customerName: request.customerName,
+        customerEmail: request.customerEmail,
+        customerPhone: request.customerPhone,
+        address: request.address,
+        propertyType: request.propertyType,
+        rooms: request.rooms,
+        bathrooms: request.bathrooms,
+        cleaningType: request.cleaningType,
+        hasSupplies: request.hasSupplies,
+        extras: request.extras,
+        startTime,
+        durationHours: request.durationHours,
+        frequency: request.frequency,
+        totalPrice: request.totalPrice,
+        paymentStatus: 'PENDING',
+        internalNote: request.internalNote,
+        status: maidId === undefined ? 'CONFIRMED' : 'ASSIGNED',
+        maidId,
+      },
+    });
+    await this.auditService.logAction(
+      'CREATE_NEXT_OCCURRENCE',
+      'ServiceRequest',
+      next.id,
+      `Intervention suivante cr\u00e9\u00e9e automatiquement apr\u00e8s la demande #${request.id}.`,
+      adminId,
+    );
+    return next;
   }
 
   // 5. Assign (or change) the staff member + audit
