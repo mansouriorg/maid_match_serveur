@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { ServiceRequestsService } from './service-requests.service';
 
 // The real services need the database. Small fakes are enough here.
@@ -42,7 +42,9 @@ describe('ServiceRequestsService', () => {
       create: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
+      findMany: jest.fn(),
     },
+    maid: { findUnique: jest.fn() },
     $transaction: jest.fn(),
   };
   const notificationsFake = {
@@ -61,6 +63,12 @@ describe('ServiceRequestsService', () => {
       paymentStatus: 'PENDING',
     });
     prismaFake.serviceRequest.update.mockResolvedValue({ id: 1 });
+    prismaFake.serviceRequest.findMany.mockResolvedValue([]);
+    prismaFake.maid.findUnique.mockResolvedValue({
+      id: 5,
+      fullName: 'Lina',
+      status: 'AVAILABLE',
+    });
     notificationsFake.notifyAdminNewRequest.mockResolvedValue(undefined);
     service = new ServiceRequestsService(
       prismaFake,
@@ -94,6 +102,103 @@ describe('ServiceRequestsService', () => {
 
     const data = prismaFake.serviceRequest.create.mock.calls[0][0].data;
     expect(data.endDate).toBeUndefined();
+  });
+
+  describe('status order and staff availability', () => {
+    const booking = (status: string) => ({
+      id: 1,
+      status,
+      startTime: new Date('2026-12-01T09:00:00.000Z'),
+      durationHours: 3,
+      maidId: null,
+      maid: null,
+      customerName: 'Ada',
+    });
+    const otherJob = (startIso: string, durationHours: number) => ({
+      id: 9,
+      startTime: new Date(startIso),
+      durationHours,
+    });
+
+    it('lets a new request be confirmed', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('REQUESTED'),
+      );
+      await service.updateStatus(1, 'CONFIRMED');
+      expect(prismaFake.serviceRequest.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { status: 'CONFIRMED' },
+        include: { maid: true },
+      });
+    });
+
+    it('refuses to skip steps or to reopen a closed booking', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('REQUESTED'),
+      );
+      await expect(service.updateStatus(1, 'COMPLETED')).rejects.toThrow(
+        BadRequestException,
+      );
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('CANCELLED'),
+      );
+      await expect(service.updateStatus(1, 'CONFIRMED')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prismaFake.serviceRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('assigns a free person without a global busy flag', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('CONFIRMED'),
+      );
+      await service.assignMaid(1, 5);
+      expect(prismaFake.serviceRequest.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { maidId: 5, status: 'ASSIGNED' },
+        include: { maid: true },
+      });
+    });
+
+    it('refuses a staff member who already works at that time', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('CONFIRMED'),
+      );
+      prismaFake.serviceRequest.findMany.mockResolvedValue([
+        otherJob('2026-12-01T10:00:00.000Z', 2),
+      ]);
+      await expect(service.assignMaid(1, 5)).rejects.toThrow(ConflictException);
+      expect(prismaFake.serviceRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('accepts the same staff member on another day', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('CONFIRMED'),
+      );
+      prismaFake.serviceRequest.findMany.mockResolvedValue([
+        otherJob('2026-11-30T12:00:00.000Z', 3),
+      ]);
+      await service.assignMaid(1, 5);
+      expect(prismaFake.serviceRequest.update).toHaveBeenCalled();
+    });
+
+    it('refuses a staff member on leave, and a finished booking', async () => {
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('CONFIRMED'),
+      );
+      prismaFake.maid.findUnique.mockResolvedValue({
+        id: 5,
+        fullName: 'Lina',
+        status: 'ON_LEAVE',
+      });
+      await expect(service.assignMaid(1, 5)).rejects.toThrow(ConflictException);
+      prismaFake.serviceRequest.findUnique.mockResolvedValue(
+        booking('COMPLETED'),
+      );
+      await expect(service.assignMaid(1, 5)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
   });
 
   it('lets a logged-in admin choose status, price and payment', async () => {

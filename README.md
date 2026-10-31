@@ -90,8 +90,15 @@ be open.
 - `endDate` (optional) is the last day of the period the customer is
   available. It is kept only when it comes after the first day.
 - `PATCH /service-requests/:id` only accepts `totalPrice` and `paymentStatus`.
-- `PATCH /service-requests/:id/status` accepts REQUESTED, CONFIRMED, ASSIGNED,
-  COMPLETED, CANCELLED and REJECTED.
+- Statuses follow a fixed order. A new request (REQUESTED) can be CONFIRMED,
+  REJECTED or CANCELLED. A CONFIRMED one gets a staff member through
+  `PATCH /service-requests/:id/assign` (it becomes ASSIGNED) or is CANCELLED.
+  An ASSIGNED one becomes COMPLETED or CANCELLED. COMPLETED, CANCELLED and
+  REJECTED are final. `PATCH /service-requests/:id/status` refuses any other
+  change.
+- A staff member is busy only during their assigned jobs. Assigning someone
+  whose job overlaps the new one, or who is ON_LEAVE, is refused (409). The
+  same person can work several jobs on different days or hours.
 
 ## Data model
 

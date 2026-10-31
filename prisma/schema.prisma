@@ -75,7 +75,7 @@ model Maid {
   isVerified      Boolean          @default(false) // Have you checked their ID/CIN?
   
   // Status
-  status          String           @default("AVAILABLE") // AVAILABLE, BUSY, ON_LEAVE
+  status          String           @default("AVAILABLE") // AVAILABLE or ON_LEAVE, set by hand (jobs are checked per time slot)
   
   // Relation back to requests
   requests        ServiceRequest[]
