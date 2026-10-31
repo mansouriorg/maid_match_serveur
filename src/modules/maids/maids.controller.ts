@@ -48,7 +48,7 @@ export class MaidsController {
   // Get details of one specific maid (includes their work history)
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.maidsService.findOne(id);
+    return this.maidsService.findProfile(id);
   }
 
   // 4. PATCH /maids/:id

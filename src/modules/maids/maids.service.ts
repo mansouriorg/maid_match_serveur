@@ -76,6 +76,25 @@ export class MaidsService {
     return maid;
   }
 
+  // 3b. The profile shown in the admin: the person, how many jobs they have
+  // completed, and their next assigned jobs (real data, nothing simulated).
+  async findProfile(id: number) {
+    const maid = await this.findOne(id);
+    const upcoming = await this.prisma.serviceRequest.findMany({
+      where: { maidId: id, status: 'ASSIGNED', startTime: { gte: new Date() } },
+      orderBy: { startTime: 'asc' },
+      take: 10,
+      select: {
+        id: true,
+        startTime: true,
+        durationHours: true,
+        address: true,
+        customerName: true,
+      },
+    });
+    return { ...maid, upcoming };
+  }
+
   // 4. Update Maid Profile (Bio, Phone, etc.)
   async update(id: number, updateMaidDto: UpdateMaidDto) {
     // Check if exists

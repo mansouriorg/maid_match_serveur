@@ -9,7 +9,7 @@ jest.mock('../../prisma/prisma.service', () => ({
 describe('MaidsService', () => {
   const prismaFake: any = {
     maid: { findUnique: jest.fn(), delete: jest.fn() },
-    serviceRequest: { count: jest.fn() },
+    serviceRequest: { count: jest.fn(), findMany: jest.fn() },
   };
   let service: MaidsService;
 
@@ -30,5 +30,14 @@ describe('MaidsService', () => {
     prismaFake.serviceRequest.count.mockResolvedValue(0);
     await service.remove(5);
     expect(prismaFake.maid.delete).toHaveBeenCalledWith({ where: { id: 5 } });
+  });
+
+  it('shows the next assigned jobs on the profile', async () => {
+    prismaFake.serviceRequest.findMany.mockResolvedValue([{ id: 9 }]);
+    const profile = await service.findProfile(5);
+    expect(profile.upcoming).toEqual([{ id: 9 }]);
+    const query = prismaFake.serviceRequest.findMany.mock.calls[0][0];
+    expect(query.where.maidId).toBe(5);
+    expect(query.where.status).toBe('ASSIGNED');
   });
 });
