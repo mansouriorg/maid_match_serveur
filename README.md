@@ -99,6 +99,9 @@ be open.
 - A staff member is busy only during their assigned jobs. Assigning someone
   whose job overlaps the new one, or who is ON_LEAVE, is refused (409). The
   same person can work several jobs on different days or hours.
+- Admins can keep an internal note on a booking (`internalNote` in
+  `PATCH /service-requests/:id`, 2000 characters at most). Customers never see
+  it, and the audit log records that it changed, not its text.
 
 ## Data model
 

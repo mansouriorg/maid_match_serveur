@@ -12,7 +12,11 @@ import type { ServiceRequest } from '../../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 
 // What an admin may send to PATCH /service-requests/:id (the rest is ignored).
-type UpdateInput = { totalPrice?: unknown; paymentStatus?: unknown };
+type UpdateInput = {
+  totalPrice?: unknown;
+  paymentStatus?: unknown;
+  internalNote?: unknown;
+};
 
 const HOUR_MS = 3600000;
 
@@ -44,13 +48,18 @@ export class ServiceRequestsService {
   // assigned booking can be given to someone else.
   private readonly assignableStatuses = ['CONFIRMED', 'ASSIGNED'];
 
-  // Keeps only the two fields an admin may change with PATCH /service-requests/:id
-  // (price and payment status) and checks them. Anything else is ignored.
+  // Keeps only the fields an admin may change with PATCH /service-requests/:id
+  // (price, payment status, internal note) and checks them. The rest is ignored.
   private cleanUpdate(raw: UpdateInput | null | undefined): {
     totalPrice?: number;
     paymentStatus?: string;
+    internalNote?: string | null;
   } {
-    const data: { totalPrice?: number; paymentStatus?: string } = {};
+    const data: {
+      totalPrice?: number;
+      paymentStatus?: string;
+      internalNote?: string | null;
+    } = {};
 
     if (raw && raw.totalPrice !== undefined) {
       const price = Number(raw.totalPrice);
@@ -73,9 +82,24 @@ export class ServiceRequestsService {
       data.paymentStatus = value;
     }
 
+    if (raw && raw.internalNote !== undefined) {
+      const note = raw.internalNote;
+      if (note !== null && typeof note !== 'string') {
+        throw new BadRequestException('internalNote must be text');
+      }
+      const text = (note ?? '').trim();
+      if (text.length > 2000) {
+        throw new BadRequestException(
+          'La note interne ne peut pas d\u00e9passer 2000 caract\u00e8res.',
+        );
+      }
+      // An empty note removes it.
+      data.internalNote = text === '' ? null : text;
+    }
+
     if (Object.keys(data).length === 0) {
       throw new BadRequestException(
-        'Nothing to update: send totalPrice and/or paymentStatus',
+        'Nothing to update: send totalPrice, paymentStatus and/or internalNote',
       );
     }
     return data;
@@ -386,6 +410,20 @@ export class ServiceRequestsService {
         'ServiceRequest',
         id,
         `Le statut de paiement est pass\u00e9 de ${oldRequest.paymentStatus} \u00e0 ${updateData.paymentStatus}.`,
+        adminId,
+      );
+    }
+
+    // Audit log: internal note changed (the text itself is not copied there)
+    if (
+      updateData.internalNote !== undefined &&
+      updateData.internalNote !== oldRequest.internalNote
+    ) {
+      await this.auditService.logAction(
+        'UPDATE_NOTE',
+        'ServiceRequest',
+        id,
+        'La note interne a \u00e9t\u00e9 modifi\u00e9e.',
         adminId,
       );
     }

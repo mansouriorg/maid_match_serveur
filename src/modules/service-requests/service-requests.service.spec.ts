@@ -226,6 +226,34 @@ describe('ServiceRequestsService', () => {
     });
   });
 
+  describe('internal note', () => {
+    it('saves a trimmed note and removes an empty one', async () => {
+      await service.update(1, { internalNote: '  Code porte 1234  ' });
+      expect(prismaFake.serviceRequest.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { internalNote: 'Code porte 1234' },
+        include: { maid: true },
+      });
+
+      await service.update(1, { internalNote: '   ' });
+      expect(prismaFake.serviceRequest.update).toHaveBeenLastCalledWith({
+        where: { id: 1 },
+        data: { internalNote: null },
+        include: { maid: true },
+      });
+    });
+
+    it('refuses a note that is too long or is not text', async () => {
+      await expect(
+        service.update(1, { internalNote: 'x'.repeat(2001) }),
+      ).rejects.toThrow(BadRequestException);
+      await expect(service.update(1, { internalNote: 42 })).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(prismaFake.serviceRequest.update).not.toHaveBeenCalled();
+    });
+  });
+
   it('lets a logged-in admin choose status, price and payment', async () => {
     const adminDto = {
       ...visitorDto,
