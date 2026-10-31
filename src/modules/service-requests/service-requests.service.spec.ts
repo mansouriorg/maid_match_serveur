@@ -43,6 +43,8 @@ describe('ServiceRequestsService', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
+      groupBy: jest.fn(),
     },
     maid: { findUnique: jest.fn() },
     $transaction: jest.fn(),
@@ -198,6 +200,29 @@ describe('ServiceRequestsService', () => {
       await expect(service.assignMaid(1, 5)).rejects.toThrow(
         BadRequestException,
       );
+    });
+  });
+
+  describe('dashboard figures', () => {
+    it('leaves cancelled and rejected requests out of the revenue', async () => {
+      prismaFake.serviceRequest.count.mockResolvedValue(5);
+      prismaFake.serviceRequest.groupBy
+        .mockResolvedValueOnce([
+          { status: 'REQUESTED', _count: { status: 2 } },
+          { status: 'CONFIRMED', _count: { status: 1 } },
+          { status: 'REJECTED', _count: { status: 1 } },
+          { status: 'CANCELLED', _count: { status: 1 } },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await service.getAnalytics();
+
+      const revenueQuery = prismaFake.serviceRequest.groupBy.mock.calls[1][0];
+      expect(revenueQuery.where).toEqual({
+        status: { notIn: ['CANCELLED', 'REJECTED'] },
+      });
+      expect(result.statusCounts.confirmed).toBe(1);
+      expect(result.statusCounts.rejected).toBe(1);
     });
   });
 

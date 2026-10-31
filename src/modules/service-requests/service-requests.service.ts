@@ -430,9 +430,10 @@ export class ServiceRequestsService {
         durationHours: true,
         totalPrice: true,
       },
+      // Cancelled and rejected requests bring no revenue.
       where: {
         status: {
-          not: 'CANCELLED',
+          notIn: ['CANCELLED', 'REJECTED'],
         },
       },
     });
@@ -463,9 +464,11 @@ export class ServiceRequestsService {
       totalRequests,
       statusCounts: {
         requested: formattedStatusCounts['REQUESTED'] || 0,
+        confirmed: formattedStatusCounts['CONFIRMED'] || 0,
         assigned: formattedStatusCounts['ASSIGNED'] || 0,
         completed: formattedStatusCounts['COMPLETED'] || 0,
         cancelled: formattedStatusCounts['CANCELLED'] || 0,
+        rejected: formattedStatusCounts['REJECTED'] || 0,
       },
       totalHours,
       estimatedRevenue,
