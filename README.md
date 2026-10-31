@@ -1,135 +1,144 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# MaidMatch - API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The server of MaidMatch, a home-cleaning service in France: a REST API for the
+booking site and the admin, live notifications over WebSocket, and a
+PostgreSQL database through Prisma.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This is one of three projects that work together:
 
-## Description
+| Project | Role | Main tools |
+| --- | --- | --- |
+| [maid_match](https://github.com/mansouriorg/maid_match) | Public booking site | Next.js 16, React 19, Tailwind CSS 4, Zustand |
+| [maid_match_admin](https://github.com/mansouriorg/maid_match_admin) | Back office for the team | Next.js 16, Socket.IO client |
+| [maid_match_serveur](https://github.com/mansouriorg/maid_match_serveur) | REST API and live notifications | NestJS 11, Prisma 7, PostgreSQL |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Architecture
+
+    src/
+      main.ts                 security headers, CORS, input validation
+      modules/
+        auth/                 login (JWT), the guard on every route, @Public()
+        admin/                admin accounts
+        service-requests/     bookings: create, price, status, assignment, planning
+        maids/                staff directory
+        notifications/        live notifications (Socket.IO), e-mail and SMS stubs
+        audit/                audit log of admin actions
+        settings/             company settings and hourly rate
+      prisma/                 database access
+    prisma/
+      schema.prisma           data model
+      migrations/             database changes, applied with prisma migrate deploy
+      seed.ts                 creates the first admin from environment values
+
+## Security choices
+
+- Every route needs a valid admin token unless it is marked `@Public()`.
+- The server decides the price, the status and the payment of a visitor's
+  booking. Only a logged-in admin can set them.
+- Inputs are checked and cleaned: unknown fields are dropped, text is trimmed
+  and filtered against HTML injection.
+- Passwords are hashed with bcrypt. `JWT_SECRET` is required, and there is no
+  default admin account.
+- Security headers come from helmet, and CORS is limited to the sites listed in
+  `CORS_ORIGINS`.
+- WebSocket connections need the admin token, and new bookings are announced
+  only to logged-in admins.
+- Admin changes such as prices and assignments are written to an audit log.
 
 ## Before the first start
 
-1. Copy `.env.example` to `.env` and fill it in. `JWT_SECRET` is required: the server
-   refuses to start without it. Use a long random value (`openssl rand -base64 48`).
-2. Set `CORS_ORIGINS` to the addresses of your sites (comma separated). When it is
-   empty, any website may call the API from a browser, and the server prints a warning.
-3. There is no default admin account. Create the first admin with the seed script:
+1. Copy `.env.example` to `.env` and fill it in. `JWT_SECRET` is required: the
+   server refuses to start without it. Use a long random value
+   (`openssl rand -base64 48`).
+2. Set `CORS_ORIGINS` to the addresses of your sites (comma separated). When it
+   is empty, any website may call the API from a browser, and the server prints
+   a warning.
+3. There is no default admin account. Create the first admin with the seed
+   script:
 
-    SEED_ADMIN_EMAIL=you@example.com SEED_ADMIN_PASSWORD='a-long-password' \
-      pnpm exec prisma db seed
+        SEED_ADMIN_EMAIL=you@example.com SEED_ADMIN_PASSWORD='a-long-password' \
+          pnpm exec prisma db seed
 
 ## Who can call what
 
-Every route needs a valid admin token (`Authorization: Bearer <token>`, from `POST /auth/login`)
-unless it is marked `@Public()` in the code. The public routes are:
+Every route needs a valid admin token (`Authorization: Bearer <token>`, from
+`POST /auth/login`) unless it is marked `@Public()` in the code. The public
+routes are:
 
 - `POST /auth/login`
 - `POST /service-requests` (the booking form of the public site)
-- `GET /settings` (a visitor only gets `defaultHourlyRate`; with a token you get everything)
+- `GET /settings` (a visitor only gets `defaultHourlyRate`; with a token you get
+  everything)
 - `GET /` (server check)
 
 The WebSocket (live notifications) needs the admin token too: send it as
 `auth: { token }` when connecting. A socket without a valid token is refused,
 and a new booking is announced only to the connected admins.
 
-To make a new route public, add `@Public()` from `src/modules/auth/public.decorator.ts`.
-Do this only for routes that really must be open.
+To make a new route public, add `@Public()` from
+`src/modules/auth/public.decorator.ts`. Do this only for routes that really must
+be open.
 
 ## Booking rules
 
 - A visitor's booking always starts as REQUESTED with payment PENDING, and the
-  server computes the price. Only a logged-in admin can set the status, the maid,
-  the price or the payment status when creating a request.
+  server computes the price. Only a logged-in admin can set the status, the
+  maid, the price or the payment status when creating a request.
+- `endDate` (optional) is the last day of the period the customer is
+  available. It is kept only when it comes after the first day.
 - `PATCH /service-requests/:id` only accepts `totalPrice` and `paymentStatus`.
 - `PATCH /service-requests/:id/status` accepts REQUESTED, CONFIRMED, ASSIGNED,
   COMPLETED, CANCELLED and REJECTED.
 
-## Project setup
+## Data model
 
-```bash
-$ pnpm install
-```
+- `ServiceRequest`: a booking (customer, home, first day and time, last day of
+  the period, duration, status, price, payment, assigned staff member).
+- `Maid`: a staff member (skills, languages, experience, rating, availability).
+- `Admin`, `AuditLog`, `Notification` and `Settings`.
 
-## Compile and run the project
+## Run it locally
 
-```bash
-# development
-$ pnpm run start
+Requirements: Node.js 24.22.1 or newer (`nvm use` picks version 24 from
+`.nvmrc`), pnpm 10, and PostgreSQL.
 
-# watch mode
-$ pnpm run start:dev
+    cp .env.example .env        # then fill in DATABASE_URL and JWT_SECRET
+    pnpm install
+    pnpm exec prisma generate
+    pnpm exec prisma migrate deploy
+    pnpm run start:dev
 
-# production mode
-$ pnpm run start:prod
-```
+The API listens on http://localhost:3000. Create the first admin as described
+in "Before the first start".
 
-## Run tests
+## Tests and checks
 
-```bash
-# unit tests
-$ pnpm run test
+    pnpm exec jest
+    pnpm exec eslint "{src,apps,libs,test}/**/*.ts"
+    pnpm exec tsc --noEmit -p tsconfig.json
+    pnpm run build
 
-# e2e tests
-$ pnpm run test:e2e
+The 34 unit tests use small fakes instead of a database, so they run anywhere in
+a few seconds. They cover the booking rules, the login guard and the public
+routes, the JWT strategy, the WebSocket login, the settings, admin passwords
+and the audit log. (`pnpm run lint` also fixes files; the command above only
+reports.)
 
-# test coverage
-$ pnpm run test:cov
-```
+## Deploy
 
-## Deployment
+Use Node.js 24.22.1 or newer. Set the same values as in `.env.example` on the
+server, with `CORS_ORIGINS` listing your real sites, then:
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+    pnpm install --frozen-lockfile
+    pnpm exec prisma generate
+    pnpm exec prisma migrate deploy
+    pnpm run build
+    pnpm run start:prod
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## Dependencies
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+pnpm only installs package versions that are at least 14 days old
+(`minimumReleaseAge` in `pnpm-workspace.yaml`). This protects against a
+malicious version being published and installed before anyone notices. A
+security fix that cannot wait is listed by name under
+`minimumReleaseAgeExclude` and pinned to an exact version in `overrides`.
