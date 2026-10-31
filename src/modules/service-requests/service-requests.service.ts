@@ -92,6 +92,16 @@ export class ServiceRequestsService {
   }
 
   // 1. Create a new request
+  // The last day of the period the customer said they are available, kept
+  // only if it comes after the first day.
+  private endDateFrom(dto: { startTime: string; endDate?: string }) {
+    if (dto.endDate === undefined) {
+      return undefined;
+    }
+    const end = new Date(dto.endDate);
+    return end > new Date(dto.startTime) ? end : undefined;
+  }
+
   async create(rawDto: CreateServiceRequestDto, isAdmin = false) {
     // A visitor of the public site cannot choose the status, the maid, the
     // price or the payment status: the server decides. Only a logged-in admin can.
@@ -140,6 +150,7 @@ export class ServiceRequestsService {
           data: {
             ...createDto,
             startTime: new Date(createDto.startTime),
+            endDate: this.endDateFrom(createDto),
             status: initialStatus,
             totalPrice: finalPrice,
             paymentStatus: paymentStat,
@@ -158,6 +169,7 @@ export class ServiceRequestsService {
         data: {
           ...createDto,
           startTime: new Date(createDto.startTime),
+          endDate: this.endDateFrom(createDto),
           status: initialStatus,
           totalPrice: finalPrice,
           paymentStatus: paymentStat,

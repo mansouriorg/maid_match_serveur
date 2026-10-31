@@ -80,6 +80,22 @@ describe('ServiceRequestsService', () => {
     expect(data.maidId).toBeUndefined();
   });
 
+  it('keeps the last day the customer is available', async () => {
+    const endDate = '2026-12-04T09:00:00.000Z';
+    await service.create({ ...visitorDto, endDate });
+
+    const data = prismaFake.serviceRequest.create.mock.calls[0][0].data;
+    expect(data.endDate).toEqual(new Date(endDate));
+  });
+
+  it('ignores an end date that is not after the first day', async () => {
+    const endDate = '2026-11-30T09:00:00.000Z';
+    await service.create({ ...visitorDto, endDate });
+
+    const data = prismaFake.serviceRequest.create.mock.calls[0][0].data;
+    expect(data.endDate).toBeUndefined();
+  });
+
   it('lets a logged-in admin choose status, price and payment', async () => {
     const adminDto = {
       ...visitorDto,

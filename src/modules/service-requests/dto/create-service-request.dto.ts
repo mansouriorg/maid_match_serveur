@@ -95,6 +95,11 @@ export class CreateServiceRequestDto {
   // Pas besoin de filtre XSS ici, IsDateString rejette strictement tout ce qui n'est pas une date ISO valide
   startTime: string;
 
+  // The last day of the period the customer said they are available.
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
   @IsInt()
   @Min(1)
   @Type(() => Number) // Auto-convert "4" to 4

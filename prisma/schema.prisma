@@ -36,6 +36,7 @@ model ServiceRequest {
 
   // Schedule Info (Matches React StepSchedule)
   startTime     DateTime
+  endDate       DateTime? // last day of the period the customer is available
   durationHours Int
   frequency     String   // one-time, weekly, etc
   
