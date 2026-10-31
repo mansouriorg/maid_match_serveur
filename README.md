@@ -25,6 +25,43 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Before the first start
+
+1. Copy `.env.example` to `.env` and fill it in. `JWT_SECRET` is required: the server
+   refuses to start without it. Use a long random value (`openssl rand -base64 48`).
+2. Set `CORS_ORIGINS` to the addresses of your sites (comma separated). When it is
+   empty, any website may call the API from a browser, and the server prints a warning.
+3. There is no default admin account. Create the first admin with the seed script:
+
+    SEED_ADMIN_EMAIL=you@example.com SEED_ADMIN_PASSWORD='a-long-password' \
+      pnpm exec prisma db seed
+
+## Who can call what
+
+Every route needs a valid admin token (`Authorization: Bearer <token>`, from `POST /auth/login`)
+unless it is marked `@Public()` in the code. The public routes are:
+
+- `POST /auth/login`
+- `POST /service-requests` (the booking form of the public site)
+- `GET /settings` (a visitor only gets `defaultHourlyRate`; with a token you get everything)
+- `GET /` (server check)
+
+The WebSocket (live notifications) needs the admin token too: send it as
+`auth: { token }` when connecting. A socket without a valid token is refused,
+and a new booking is announced only to the connected admins.
+
+To make a new route public, add `@Public()` from `src/modules/auth/public.decorator.ts`.
+Do this only for routes that really must be open.
+
+## Booking rules
+
+- A visitor's booking always starts as REQUESTED with payment PENDING, and the
+  server computes the price. Only a logged-in admin can set the status, the maid,
+  the price or the payment status when creating a request.
+- `PATCH /service-requests/:id` only accepts `totalPrice` and `paymentStatus`.
+- `PATCH /service-requests/:id/status` accepts REQUESTED, CONFIRMED, ASSIGNED,
+  COMPLETED, CANCELLED and REJECTED.
+
 ## Project setup
 
 ```bash

@@ -1,21 +1,26 @@
-import { Controller, Get, Patch, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Body, Request } from '@nestjs/common';
 import { SettingsService } from './settings.service';
 import { UpdateSettingsDto } from './dto/update-settings.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'; // Assure-toi que ce chemin correspond bien à ton dossier auth
+import { Public } from '../auth/public.decorator';
 
 @Controller('settings')
 export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
-  // 🌍 ROUTE PUBLIQUE : Accessible par le client sur la Landing Page et le Wizard
+  // PUBLIC for the booking site, which only needs the hourly rate.
+  // With a valid admin token the full settings are returned.
+  @Public()
   @Get()
-  async getSettings() {
-    return this.settingsService.getSettings();
+  async getSettings(@Request() req: { user?: unknown }) {
+    const settings = await this.settingsService.getSettings();
+    if (req.user) {
+      return settings;
+    }
+    return { defaultHourlyRate: settings.defaultHourlyRate };
   }
 
-  // 🛡️ ROUTE PROTÉGÉE : Accessible UNIQUEMENT par l'administrateur connecté
+  // Needs an admin token (every route does unless it is marked @Public).
   @Patch()
-  @UseGuards(JwtAuthGuard)
   async updateSettings(@Body() updateSettingsDto: UpdateSettingsDto) {
     return this.settingsService.updateSettings(updateSettingsDto);
   }

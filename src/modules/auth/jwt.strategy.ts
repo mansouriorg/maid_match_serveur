@@ -5,19 +5,18 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly configService: ConfigService) {
+  constructor(configService: ConfigService) {
     super({
-      // On indique qu'on va envoyer le token dans le Header d'autorisation (Bearer Token)
+      // The token is sent in the Authorization header (Bearer token)
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      // ⚠️ On lit la variable d'environnement, avec le MÊME fallback que dans AuthModule
-      secretOrKey: configService.get<string>('JWT_SECRET') || 'MAIDMATCH_SECRET_KEY_2026_VERY_SECURE', 
+      // Same secret as in AuthModule. There is no default value.
+      secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
 
-  async validate(payload: any) {
-    // Cette méthode s'exécute automatiquement si le token est valide.
-    // Elle attache ces informations à l'objet "request" (accessible via req.user)
+  // Runs when the token is valid. The result becomes req.user.
+  validate(payload: { sub: number; email: string }) {
     return { userId: payload.sub, email: payload.email };
   }
 }

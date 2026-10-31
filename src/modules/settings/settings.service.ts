@@ -9,7 +9,7 @@ export class SettingsService {
   async getSettings() {
     // Cherche la ligne d'ID 1. Si elle n'existe pas, Prisma va la créer avec les valeurs par défaut.
     let settings = await this.prisma.settings.findUnique({ where: { id: 1 } });
-    
+
     if (!settings) {
       settings = await this.prisma.settings.create({ data: { id: 1 } });
     }
@@ -18,11 +18,13 @@ export class SettingsService {
 
   async updateSettings(data: UpdateSettingsDto) {
     // 1. On crée une copie propre des données validées
-    const updatePayload: any = { ...data };
+    const updatePayload: UpdateSettingsDto = { ...data };
 
     // 2. Conversion sécurisée du taux horaire (s'il est présent dans la requête)
     if (updatePayload.defaultHourlyRate !== undefined) {
-      updatePayload.defaultHourlyRate = parseFloat(updatePayload.defaultHourlyRate.toString());
+      updatePayload.defaultHourlyRate = parseFloat(
+        updatePayload.defaultHourlyRate.toString(),
+      );
     }
 
     // 3. Mise à jour en base de données

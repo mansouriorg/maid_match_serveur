@@ -33,12 +33,12 @@ export class AuthService {
 
     // 2. Generate JWT Token
     const payload = { sub: admin.id, email: admin.email };
-    
+
     return {
       access_token: this.jwtService.sign(payload),
     };
   }
-  
+
   // Helper to create the very first admin (Call this manually once)
   async registerAdmin(loginDto: LoginDto) {
     const hashedPassword = await bcrypt.hash(loginDto.password, 10);

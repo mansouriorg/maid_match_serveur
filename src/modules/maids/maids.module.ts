@@ -6,6 +6,6 @@ import { MaidsController } from './maids.controller';
   controllers: [MaidsController],
   providers: [MaidsService],
   // Export Service if you want to use it in other modules (like assigning a maid in ServiceRequests)
-  exports: [MaidsService], 
+  exports: [MaidsService],
 })
 export class MaidsModule {}

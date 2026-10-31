@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'; // <-- Nouveaux imports
 
 import { AppController } from './app.controller';
+import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
 import { AppService } from './app.service';
 
 // Core Database Module
@@ -26,10 +27,12 @@ import { AuditModule } from './modules/audit/audit.module';
     }),
 
     // 2. Sécurité : Rate Limiting Global (Protection anti-bruteforce/DDoS)
-    ThrottlerModule.forRoot([{
-      ttl: 60000, // Temps de la fenêtre en millisecondes (ici 60 secondes)
-      limit: 100, // Nombre max de requêtes autorisées par IP dans cette fenêtre
-    }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // Temps de la fenêtre en millisecondes (ici 60 secondes)
+        limit: 100, // Nombre max de requêtes autorisées par IP dans cette fenêtre
+      },
+    ]),
 
     // 3. Database
     PrismaModule,
@@ -41,7 +44,7 @@ import { AuditModule } from './modules/audit/audit.module';
     SettingsModule,
     NotificationsModule,
     AdminModule,
-    AuditModule
+    AuditModule,
   ],
   controllers: [AppController],
   providers: [
@@ -50,6 +53,10 @@ import { AuditModule } from './modules/audit/audit.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
     },
   ],
 })

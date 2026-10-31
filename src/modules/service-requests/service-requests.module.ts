@@ -9,9 +9,9 @@ import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
-    PrismaModule,         // Requis pour lire/écrire dans la base de données
-    NotificationsModule,  // Requis pour alerter l'admin des nouvelles missions
-    AuditModule           // Requis pour tracer toutes les actions (Le correctif de l'erreur !)
+    PrismaModule, // Requis pour lire/écrire dans la base de données
+    NotificationsModule, // Requis pour alerter l'admin des nouvelles missions
+    AuditModule, // Requis pour tracer toutes les actions (Le correctif de l'erreur !)
   ],
   controllers: [ServiceRequestsController],
   providers: [ServiceRequestsService],

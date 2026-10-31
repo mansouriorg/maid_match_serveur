@@ -1,13 +1,13 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
-  Query, 
-  ParseIntPipe 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { MaidsService } from './maids.service';
 import { CreateMaidDto } from './dto/create-maid.dto';
@@ -34,12 +34,13 @@ export class MaidsController {
   ) {
     // Convert query strings to correct types for the Service
     const experience = minExperience ? parseInt(minExperience) : undefined;
-    const verified = isVerified === 'true' ? true : isVerified === 'false' ? false : undefined;
+    const verified =
+      isVerified === 'true' ? true : isVerified === 'false' ? false : undefined;
 
-    return this.maidsService.findAll({ 
-      specialty, 
-      minExperience: experience, 
-      isVerified: verified 
+    return this.maidsService.findAll({
+      specialty,
+      minExperience: experience,
+      isVerified: verified,
     });
   }
 

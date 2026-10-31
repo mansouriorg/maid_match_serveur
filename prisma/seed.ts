@@ -4,53 +4,58 @@ import 'dotenv/config';
 // 2. Import dependencies
 import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
-// IMPORTANT: Adjust this path if your generated client is elsewhere
-import { PrismaClient } from '../generated/prisma/client'; 
+import { PrismaClient } from '../generated/prisma/client';
 import * as bcrypt from 'bcrypt';
 
-// 3. Setup the Database Adapter
-// (REQUIRED because your schema uses "driverAdapters" or "prisma-client" provider)
+// 3. Setup the database adapter
 const connectionString = process.env.DATABASE_URL;
-
-// Create a Postgres connection pool
 const pool = new Pool({ connectionString });
-// Create the Prisma adapter
 const adapter = new PrismaPg(pool);
-// Pass the adapter to the client
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  console.log('🌱 Starting seed...');
+  console.log('Starting seed...');
 
-  // 4. Define your initial Admin credentials
-  const email = 'admin@maidmatch.com';
-  const rawPassword = 'SecurePassword123!'; 
+  // 4. The first admin comes from the environment. There is no default account.
+  // Example:
+  //   SEED_ADMIN_EMAIL=you@example.com SEED_ADMIN_PASSWORD=a-long-password \
+  //   pnpm exec prisma db seed
+  const rawEmail = process.env.SEED_ADMIN_EMAIL;
+  const rawPassword = process.env.SEED_ADMIN_PASSWORD;
 
-  // 5. Hash the password (using bcrypt as requested)
-  const saltRounds = 10;
-  const hashedPassword = await bcrypt.hash(rawPassword, saltRounds);
+  if (rawEmail === undefined || rawEmail.trim() === '') {
+    throw new Error('Set SEED_ADMIN_EMAIL before running the seed.');
+  }
+  if (rawPassword === undefined || rawPassword.length < 12) {
+    throw new Error('Set SEED_ADMIN_PASSWORD (at least 12 characters).');
+  }
 
-  // 6. Create (or Update) the Admin
+  // The login form lowercases the e-mail, so the stored one must be lowercase.
+  const email = rawEmail.trim().toLowerCase();
+
+  // 5. Hash the password
+  const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+  // 6. Create the admin (or leave it as it is when it already exists)
   const admin = await prisma.admin.upsert({
-    where: { email: email },
-    update: {}, // If exists, do nothing
+    where: { email },
+    update: {},
     create: {
-      email: email,
+      email,
       password: hashedPassword,
     },
   });
 
-  console.log(`✅ Admin user seeded: ${admin.email}`);
-  // console.log(`🔑 Password: ${rawPassword}`); // Keep secure
+  console.log('Admin user seeded: ' + admin.email);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seeding failed:', e);
+    console.error('Seeding failed:', e);
     process.exit(1);
   })
   .finally(async () => {
     // 7. Clean up connections
     await prisma.$disconnect();
-    await pool.end(); // Close the pool explicitly to ensure the script exits
+    await pool.end();
   });

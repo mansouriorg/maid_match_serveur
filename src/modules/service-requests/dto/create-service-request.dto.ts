@@ -1,14 +1,14 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsInt, 
-  IsOptional, 
-  IsDateString, 
-  Min, 
-  IsEmail, 
-  IsBoolean, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsInt,
+  IsOptional,
+  IsDateString,
+  Min,
+  IsEmail,
+  IsBoolean,
   IsArray,
-  IsNumber 
+  IsNumber,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import * as xss from 'xss'; // <-- Import de la bibliothèque de sécurité
@@ -17,12 +17,14 @@ export class CreateServiceRequestDto {
   // --- Customer Info ---
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? xss.filterXSS(value.trim()) : value,
+  )
   customerName: string;
 
   @IsEmail()
   @IsNotEmpty()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return xss.filterXSS(value.trim().toLowerCase()); // Nettoyage + minuscules
     }
@@ -32,18 +34,24 @@ export class CreateServiceRequestDto {
 
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? xss.filterXSS(value.trim()) : value,
+  )
   customerPhone: string;
 
   // --- Property Info ---
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? xss.filterXSS(value.trim()) : value,
+  )
   address: string;
 
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? xss.filterXSS(value.trim()) : value,
+  )
   propertyType: string; // e.g. "apartment", "villa", "office"
 
   @IsInt()
@@ -58,7 +66,9 @@ export class CreateServiceRequestDto {
 
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? xss.filterXSS(value.trim()) : value,
+  )
   cleaningType: string; // e.g. "standard", "deep"
 
   @IsBoolean()
@@ -68,20 +78,22 @@ export class CreateServiceRequestDto {
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     // Nettoyage de chaque option dans le tableau ["ironing", "pets"]
     if (Array.isArray(value)) {
-      return value.map(v => (typeof v === 'string' ? xss.filterXSS(v.trim()) : v));
+      return (value as unknown[]).map((v) =>
+        typeof v === 'string' ? xss.filterXSS(v.trim()) : v,
+      );
     }
     return value;
   })
   extras?: string[];
 
   // --- Schedule Info ---
-  @IsDateString() 
+  @IsDateString()
   @IsNotEmpty()
   // Pas besoin de filtre XSS ici, IsDateString rejette strictement tout ce qui n'est pas une date ISO valide
-  startTime: string; 
+  startTime: string;
 
   @IsInt()
   @Min(1)
@@ -90,24 +102,26 @@ export class CreateServiceRequestDto {
 
   @IsString()
   @IsNotEmpty()
-  @Transform(({ value }) => (typeof value === 'string' ? xss.filterXSS(value.trim()) : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? xss.filterXSS(value.trim()) : value,
+  )
   frequency: string; // e.g. "one-time", "weekly"
 
   // --- Admin / System Fields ---
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return xss.filterXSS(value.trim().toUpperCase()); // Force majuscules
     }
     return value;
   })
-  status?: string; 
+  status?: string;
 
   @IsOptional()
   @IsInt()
   @Type(() => Number)
-  maidId?: number; 
+  maidId?: number;
 
   // --- NOUVEAUX CHAMPS FINANCIERS ---
   @IsOptional()
@@ -117,11 +131,11 @@ export class CreateServiceRequestDto {
 
   @IsOptional()
   @IsString()
-  @Transform(({ value }) => {
+  @Transform(({ value }: { value: unknown }) => {
     if (typeof value === 'string') {
       return xss.filterXSS(value.trim().toUpperCase()); // Force majuscules (ex: " paid " -> "PAID")
     }
     return value;
   })
-  paymentStatus?: string; 
+  paymentStatus?: string;
 }

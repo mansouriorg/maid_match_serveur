@@ -1,32 +1,41 @@
-// src/modules/service-requests/service-requests.controller.ts
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
-  ParseIntPipe, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseIntPipe,
   Query,
-  Request // <-- NOUVEL IMPORT ICI
+  Request,
 } from '@nestjs/common';
 import { ServiceRequestsService } from './service-requests.service';
 import { CreateServiceRequestDto } from './dto/create-service-request.dto';
+import { Public } from '../auth/public.decorator';
+
+// What the login token gives us (see JwtStrategy.validate).
+type AuthedRequest = { user?: { userId?: number } };
 
 @Controller('service-requests')
 export class ServiceRequestsController {
-  constructor(private readonly serviceRequestsService: ServiceRequestsService) {}
+  constructor(
+    private readonly serviceRequestsService: ServiceRequestsService,
+  ) {}
 
   // 1. POST /service-requests
-  // Used by: Frontend Wizard (StepSummary)
+  // PUBLIC. Used by: booking wizard on the public site (StepSummary)
+  @Public()
   @Post()
-  create(@Body() createDto: CreateServiceRequestDto) {
-    return this.serviceRequestsService.create(createDto);
+  create(
+    @Body() createDto: CreateServiceRequestDto,
+    @Request() req: AuthedRequest,
+  ) {
+    return this.serviceRequestsService.create(createDto, Boolean(req.user));
   }
 
   // 2. GET /service-requests
-  // Used by: Admin Dashboard (List View) & Calendar Planning
+  // Admin only. Used by: dashboard list and calendar planning
   @Get()
   findAll(
     @Query('status') status?: string,
@@ -34,74 +43,70 @@ export class ServiceRequestsController {
     @Query('minDate') minDate?: string, // Start of calendar range
     @Query('maxDate') maxDate?: string, // End of calendar range
   ) {
-    return this.serviceRequestsService.findAll({ 
-      status, 
-      search, 
-      minDate, 
-      maxDate 
+    return this.serviceRequestsService.findAll({
+      status,
+      search,
+      minDate,
+      maxDate,
     });
   }
 
   // 3. GET /service-requests/analytics
-  // Used by: Admin Dashboard (Stats Cards)
-  // ⚠️ DOIT TOUJOURS ÊTRE AVANT @Get(':id')
+  // Admin only. Used by: dashboard stats cards
+  // MUST ALWAYS COME BEFORE @Get(':id')
   @Get('analytics')
   async getAnalytics() {
     return this.serviceRequestsService.getAnalytics();
   }
 
   // 4. GET /service-requests/:id
-  // Used by: Admin Dashboard (Detail View)
+  // Admin only. Used by: detail view
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.serviceRequestsService.findOne(id);
   }
 
   // 5. PATCH /service-requests/:id/status
-  // Used by: Admin (Mark as "CONFIRMED", "COMPLETED" or "CANCELLED")
+  // Admin only. Mark as "CONFIRMED", "COMPLETED" or "CANCELLED"
   @Patch(':id/status')
   updateStatus(
-    @Param('id', ParseIntPipe) id: number, 
+    @Param('id', ParseIntPipe) id: number,
     @Body('status') status: string,
-    @Request() req: any // <-- INJECTION DE LA REQUÊTE
+    @Request() req: AuthedRequest,
   ) {
-    // Récupération de l'ID Admin (fallback selon la configuration de ton JWT : sub ou id)
-    const adminId = req.user?.sub || req.user?.id;
-    return this.serviceRequestsService.updateStatus(id, status, adminId);
+    return this.serviceRequestsService.updateStatus(
+      id,
+      status,
+      req.user?.userId,
+    );
   }
 
   // 6. PATCH /service-requests/:id/assign
-  // Used by: Admin (Assign a Maid to a Request)
+  // Admin only. Assign a maid to a request
   @Patch(':id/assign')
   assignMaid(
     @Param('id', ParseIntPipe) id: number,
     @Body('maidId', ParseIntPipe) maidId: number,
-    @Request() req: any // <-- INJECTION DE LA REQUÊTE
+    @Request() req: AuthedRequest,
   ) {
-    const adminId = req.user?.sub || req.user?.id;
-    return this.serviceRequestsService.assignMaid(id, maidId, adminId);
+    return this.serviceRequestsService.assignMaid(id, maidId, req.user?.userId);
   }
 
   // 7. PATCH /service-requests/:id
-  // Used by: Admin (Update general fields like paymentStatus)
+  // Admin only. Update general fields like paymentStatus
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateData: any,
-    @Request() req: any // <-- INJECTION DE LA REQUÊTE
+    @Request() req: AuthedRequest,
   ) {
-    const adminId = req.user?.sub || req.user?.id;
-    return this.serviceRequestsService.update(id, updateData, adminId);
+    return this.serviceRequestsService.update(id, updateData, req.user?.userId);
   }
 
   // 8. DELETE /service-requests/:id
-  // Used by: Admin (Remove spam or cancelled requests)
+  // Admin only. Remove spam or cancelled requests
   @Delete(':id')
-  remove(
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: any // <-- INJECTION DE LA REQUÊTE
-  ) {
-    const adminId = req.user?.sub || req.user?.id;
-    return this.serviceRequestsService.remove(id, adminId);
+  remove(@Param('id', ParseIntPipe) id: number, @Request() req: AuthedRequest) {
+    return this.serviceRequestsService.remove(id, req.user?.userId);
   }
 }

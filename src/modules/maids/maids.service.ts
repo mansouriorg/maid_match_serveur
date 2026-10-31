@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateMaidDto } from './dto/create-maid.dto';
-import { UpdateMaidDto } from './dto/update-maid.dto'; 
+import { UpdateMaidDto } from './dto/update-maid.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -14,17 +14,17 @@ export class MaidsService {
       data: {
         ...createMaidDto,
         status: 'AVAILABLE', // Default status
-        rating: 5.0,         // Default starting rating
-        isVerified: false,   // Default to unverified
+        rating: 5.0, // Default starting rating
+        isVerified: false, // Default to unverified
       },
     });
   }
 
   // 2. Get Maids (With Smart Filters)
   // Allows you to search: "Find me a verified maid with 3+ years experience"
-  async findAll(filters?: { 
-    specialty?: string; 
-    minExperience?: number; 
+  async findAll(filters?: {
+    specialty?: string;
+    minExperience?: number;
     isVerified?: boolean;
   }) {
     const { specialty, minExperience, isVerified } = filters || {};
@@ -32,7 +32,9 @@ export class MaidsService {
     return this.prisma.maid.findMany({
       where: {
         // Filter by Specialty (case insensitive)
-        specialty: specialty ? { contains: specialty, mode: 'insensitive' } : undefined,
+        specialty: specialty
+          ? { contains: specialty, mode: 'insensitive' }
+          : undefined,
         // Filter by Minimum Experience
         experienceYears: minExperience ? { gte: +minExperience } : undefined,
         // Filter by Verification Status
@@ -63,7 +65,7 @@ export class MaidsService {
   // 4. Update Maid Profile (Bio, Phone, etc.)
   async update(id: number, updateMaidDto: UpdateMaidDto) {
     // Check if exists
-    await this.findOne(id); 
+    await this.findOne(id);
 
     return this.prisma.maid.update({
       where: { id },

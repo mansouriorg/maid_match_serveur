@@ -3,6 +3,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotificationsGateway } from './notifications.gateway';
 import { PrismaService } from '../../prisma/prisma.service'; // Assure-toi que ce chemin est correct
 
+// What the notification needs to know about a new booking.
+type NewRequestInfo = {
+  id: number;
+  customerName?: string;
+  cleaningType?: string;
+};
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -10,28 +17,30 @@ export class NotificationsService {
   // 0. Injection du Gateway (temps réel) ET de Prisma (base de données)
   constructor(
     private readonly notificationsGateway: NotificationsGateway,
-    private readonly prisma: PrismaService 
+    private readonly prisma: PrismaService,
   ) {}
 
-  // 1. Send Email (Mock implementation)
-  async sendEmail(to: string, subject: string, content: string) {
+  // 1. Send Email (mock: no real e-mail is sent yet)
+  sendEmail(to: string, subject: string, content: string) {
     // In the future, install 'nodemailer' and put real logic here
-    this.logger.log(`[EMAIL SENT] To: ${to} | Subject: ${subject} | Content: ${content}`);
-    return { success: true };
+    this.logger.log(
+      `[EMAIL SENT] To: ${to} | Subject: ${subject} | Content: ${content}`,
+    );
+    return Promise.resolve({ success: true });
   }
 
-  // 2. Send SMS (Mock implementation)
-  async sendSms(phoneNumber: string, message: string) {
+  // 2. Send SMS (mock: no real SMS is sent yet)
+  sendSms(phoneNumber: string, message: string) {
     // In the future, install 'twilio' and put real logic here
     this.logger.log(`[SMS SENT] To: ${phoneNumber} | Message: ${message}`);
-    return { success: true };
+    return Promise.resolve({ success: true });
   }
 
   // 3. Notify Admin about new request (Mise à jour : BDD + Email + WebSocket)
-  async notifyAdminNewRequest(serviceRequest: any) {
+  async notifyAdminNewRequest(serviceRequest: NewRequestInfo) {
     const customerName = serviceRequest.customerName || 'Un client';
     const cleaningType = serviceRequest.cleaningType || 'nettoyage';
-    
+
     const title = 'Nouvelle demande de nettoyage !';
     const message = `${customerName} a demandé une intervention (${cleaningType}).`;
 
@@ -44,20 +53,16 @@ export class NotificationsService {
         serviceRequestId: serviceRequest.id, // <-- AJOUT ICI : Lien avec l'ID de la demande
       },
     });
-    
+
     // 3.2 Déclencher l'alerte par Email (Mock)
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-    await this.sendEmail(
-      adminEmail, 
-      title, 
-      `${message} Check dashboard.`
-    );
+    await this.sendEmail(adminEmail, title, `${message} Check dashboard.`);
 
     // 3.3 Déclencher l'alerte en temps réel sur le frontend (WebSocket)
     // On diffuse la notification sauvegardée (avec son vrai ID) + les données de la requête
-    this.notificationsGateway.server.emit('new-intervention', {
-      ...savedNotification, 
-      data: serviceRequest, 
+    this.notificationsGateway.emitToAdmins('new-intervention', {
+      ...savedNotification,
+      data: serviceRequest,
     });
   }
 
